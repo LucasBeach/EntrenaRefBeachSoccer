@@ -447,23 +447,37 @@ function synthWhistle(){
 }
 
 const TONE_CACHE = {};
-function beep(freq, dur, vol){
+let sfxEl = null;
+function ensureSfxEl(){
+  if(!sfxEl){
+    sfxEl = new Audio();
+    sfxEl.playsInline = true;
+  }
+  return sfxEl;
+}
+function playSfx(uri){
   try{
-    const key = freq+'_'+dur+'_'+vol;
-    if(!TONE_CACHE[key]) TONE_CACHE[key] = synthTone(freq, dur, vol||0.15);
-    const a = new Audio(TONE_CACHE[key]);
-    a.play().catch(()=>{});
+    const el = ensureSfxEl();
+    el.pause();
+    el.src = uri;
+    el.currentTime = 0;
+    const p = el.play();
+    if(p && p.catch) p.catch(()=>{});
   }catch(e){}
 }
 
-let WHISTLE_URI = null;
-function whistle(){
-  try{
-    if(!WHISTLE_URI) WHISTLE_URI = synthWhistle();
-    const a = new Audio(WHISTLE_URI);
-    a.play().catch(()=>{});
-  }catch(e){}
+function beep(freq, dur, vol){
+  const key = freq+'_'+dur+'_'+vol;
+  if(!TONE_CACHE[key]) TONE_CACHE[key] = synthTone(freq, dur, vol||0.15);
+  playSfx(TONE_CACHE[key]);
 }
+
+function whistle(){
+  if(!WHISTLE_URI) WHISTLE_URI = synthWhistle();
+  playSfx(WHISTLE_URI);
+}
+
+let WHISTLE_URI = null;
 
 // ── Conexión a Supabase (base de datos real, independiente de Claude) ──
 const SUPABASE_URL = 'https://mnhgaewvfuzpsoharyhi.supabase.co';
@@ -1591,8 +1605,10 @@ function preloadVideo(url){
 
 function primeMedia(){
   try{
-    const a = new Audio(synthTone(1, 0.05, 0.0001));
-    a.play().catch(()=>{});
+    const el = ensureSfxEl();
+    el.src = synthTone(1, 0.05, 0.0001);
+    const p = el.play();
+    if(p && p.catch) p.catch(()=>{});
   }catch(e){}
   try{
     const v = document.createElement('video');
