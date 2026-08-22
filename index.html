@@ -2602,8 +2602,12 @@ function finishPrueba(stopped){
   if(pr.audio){ try{ pr.audio.pause(); }catch(e){} pr.audio=null; }
   if(pr.kind==='yoyo' && pr.startTime) pr.elapsedSec = (Date.now()-pr.startTime)/1000;
   pr.phase='done';
-  try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
-  try{ if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }catch(e){}
+  // Esperamos un instante antes de soltar la orientación/pantalla completa: si se hace en el
+  // mismo momento que suena el silbato final, el cambio de pantalla corta el audio a la mitad.
+  setTimeout(()=>{
+    try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
+    try{ if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }catch(e){}
+  }, 400);
   const label = pr.kind==='yoyo' ? `ariet-pasadas${pr.reachedLevel||0}-${fmtClock(pr.elapsedSec||0)}` : `${pr.kind}-${pr.seconds}s`;
   const record = { date:new Date().toISOString(), email:state.userEmail, type:'prueba-'+label, series:1, topScore:1, bottomScore:1 };
   state.history.push(record);
