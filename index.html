@@ -223,6 +223,13 @@
 
   /* immersive full-screen session mode */
   body.session-mode{padding-bottom:0; height:100dvh; height:100vh; overflow:hidden;}
+  body.force-landscape-lock{overflow:hidden;}
+  body.force-landscape-lock #app{
+    position:fixed; top:0; left:0;
+    width:100vh; height:100vw;
+    transform-origin:top left;
+    transform:rotate(90deg) translateY(-100%);
+  }
   body.session-mode #app{max-width:100%; height:100%; padding:8px 10px calc(6px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box;}
   body.session-mode #screenBody{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; overflow:hidden;}
   body.session-mode .card{border-radius:18px;}
@@ -1562,12 +1569,27 @@ function isLandscape(){
 
 function checkRotateGuard(){
   const guard = document.getElementById('rotateGuard');
-  if(!guard) return;
-  const runningExercise = document.body.classList.contains('session-mode')
-    && !['ready','rotate'].includes((state.session||{}).phase)
-    && !['ready','rotate'].includes((state.vt||{}).phase)
-    && !['ready','rotate','done'].includes((state.prueba||{}).phase);
-  guard.style.display = (runningExercise && !isLandscape()) ? 'flex' : 'none';
+  const inSessionMode = document.body.classList.contains('session-mode');
+  if(!inSessionMode){
+    if(guard) guard.style.display = 'none';
+    document.body.classList.remove('force-landscape-lock');
+    return;
+  }
+  const preStart = ['ready','rotate'].includes((state.session||{}).phase)
+    || ['ready','rotate'].includes((state.vt||{}).phase)
+    || ['ready','rotate','done'].includes((state.prueba||{}).phase);
+
+  if(preStart){
+    // Todavía no arrancó el ejercicio: acá sí pedimos girar el celular, una vez.
+    if(guard) guard.style.display = isLandscape() ? 'none' : 'flex';
+    document.body.classList.remove('force-landscape-lock');
+  } else {
+    // Ya arrancó: nunca más se pide girar. Si el teléfono físicamente está en vertical,
+    // forzamos el mismo look horizontal con una transformación de pantalla, sin interrumpir
+    // el ejercicio ni volver a preguntar nada hasta que termine.
+    if(guard) guard.style.display = 'none';
+    document.body.classList.toggle('force-landscape-lock', !isLandscape());
+  }
 }
 window.addEventListener('resize', checkRotateGuard);
 window.addEventListener('orientationchange', checkRotateGuard);
