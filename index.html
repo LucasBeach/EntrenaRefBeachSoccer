@@ -1611,9 +1611,25 @@ function showSaveDiscardPrompt(onSave, onDiscard){
   overlay.querySelector('#saveBtn').onclick = ()=>{ overlay.remove(); onSave(); };
 }
 
+let wakeLock = null;
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator){
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', ()=>{ wakeLock = null; });
+    }
+  }catch(e){}
+}
+document.addEventListener('visibilitychange', async ()=>{
+  if(document.visibilityState==='visible' && document.body.classList.contains('session-mode') && !wakeLock){
+    await requestWakeLock();
+  }
+});
+
 function releaseImmersive(){
   try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
   try{ if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }catch(e){}
+  try{ if(wakeLock){ wakeLock.release(); wakeLock = null; } }catch(e){}
 }
 
 function exitSessionRequest(){
@@ -1821,7 +1837,7 @@ function checkRotateGuard(){
   else if(state.screen==='videoTestSession' && state.vt) phase = state.vt.phase;
   else if(state.screen==='pruebaRun' && state.prueba) phase = state.prueba.phase;
 
-  const preStart = phase==='ready' || phase==='rotate' || phase==='done';
+  const preStart = phase==='ready' || phase==='rotate' || phase==='done' || phase==='levelSurvey';
 
   if(preStart){
     // Todavía no arrancó el ejercicio (o ya terminó): acá sí pedimos girar el celular, una vez.
@@ -1870,6 +1886,7 @@ function preloadVideo(url){
 }
 
 function primeMedia(){
+  requestWakeLock();
   try{
     const el = ensureSfxEl();
     el.src = synthTone(1, 0.05, 0.0001);
@@ -2214,6 +2231,7 @@ async function finishSession(){
   try{ await dbInsertHistory(rec); }catch(e){ console.error(e); }
   try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
   try{ if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }catch(e){}
+  try{ if(wakeLock){ wakeLock.release(); wakeLock = null; } }catch(e){}
   state.screen='summary';
   render();
 }
@@ -2503,6 +2521,7 @@ async function finishVideoTest(){
   const vt = state.vt;
   try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
   try{ if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }catch(e){}
+  try{ if(wakeLock){ wakeLock.release(); wakeLock = null; } }catch(e){}
   let correct=0;
   vt.results.forEach(r=>{
     r.topOk = r.selectedTop===r.ex.top;
@@ -2776,6 +2795,81 @@ function renderPruebaRun(body){
     return;
   }
 
+  if(pr.phase==='levelSurvey'){
+    const LEVEL_OPTIONS = ['14.8','15.0','15.1','15.2','15.3','15.4','15.5.1','15.5.2','15.5.3','15.5.4','15.5.5','15.5.6','16.1','16.2','16.3','16.4','16.5','16.6','16.7','16.5.1','16.5.2','16.5.3','16.5.4','16.5.5','16.5.6','17.1'];
+    const STAR_LABELS = ['Me falta','Muy justo','Llegué bien','+ aún','Sobrado'];
+    body.innerHTML = `
+      <div style="display:flex; flex-direction:column; height:100%; gap:6px;">
+        <div style="flex:0 0 auto;">
+          <div class="eyebrow" style="text-align:center; font-size:12px;">¿En qué nivel terminaste?</div>
+        </div>
+        <div id="levelGrid" style="flex:1; min-height:0; overflow-y:auto; display:grid; grid-template-columns:repeat(6,1fr); gap:5px; padding:2px;"></div>
+        <div style="flex:0 0 auto;">
+          <div class="eyebrow" style="text-align:center; font-size:11px; margin-top:6px;">¿Cómo te sentiste?</div>
+          <div id="starRow2" style="display:grid; grid-template-columns:repeat(5,1fr); gap:4px; margin-top:4px;"></div>
+          <button class="btn btn-primary" id="levelContinueBtn" style="margin-top:8px; padding:10px;">Continuar</button>
+        </div>
+      </div>
+    `;
+    let chosenLevel = (pr.historyRecord && pr.historyRecord.officialLevel) || null;
+    let chosenRating = (pr.historyRecord && pr.historyRecord.perceivedRating) || null;
+    let chosenLabel = (pr.historyRecord && pr.historyRecord.perceivedLabel) || null;
+
+    const grid = body.querySelector('#levelGrid');
+    function paintLevelBtns(){
+      grid.querySelectorAll('.opt-btn').forEach(b=>{
+        b.classList.toggle('selected', b.dataset.lvl===chosenLevel);
+      });
+    }
+    LEVEL_OPTIONS.forEach(lvl=>{
+      const btn = document.createElement('button');
+      btn.className = 'opt-btn';
+      btn.dataset.lvl = lvl;
+      btn.style.cssText = 'min-height:0; height:auto; padding:10px 2px; font-size:13px;';
+      btn.textContent = lvl;
+      btn.onclick = ()=>{ chosenLevel = lvl; paintLevelBtns(); };
+      grid.appendChild(btn);
+    });
+    const moreBtn = document.createElement('button');
+    moreBtn.className = 'opt-btn';
+    moreBtn.style.cssText = 'min-height:0; height:auto; padding:10px 2px; font-size:13px;';
+    moreBtn.textContent = 'Más';
+    moreBtn.onclick = ()=>{
+      const val = prompt('Ingresá el nivel:', chosenLevel||'');
+      if(val){ chosenLevel = val.trim(); paintLevelBtns(); grid.appendChild(moreBtn); }
+    };
+    grid.appendChild(moreBtn);
+    paintLevelBtns();
+
+    const starRow2 = body.querySelector('#starRow2');
+    STAR_LABELS.forEach((label,i)=>{
+      const n = i+1;
+      const btn = document.createElement('button');
+      btn.className = 'opt-btn';
+      btn.style.cssText = 'flex-direction:column; padding:5px 2px; min-height:0; height:auto; gap:2px;';
+      if(chosenRating===n) btn.classList.add('selected');
+      btn.innerHTML = `<span style="font-size:12px; letter-spacing:-1px;">${'★'.repeat(n)}</span><span style="font-size:8.5px; line-height:1.05; font-weight:700;">${label}</span>`;
+      btn.onclick = ()=>{
+        starRow2.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('selected'));
+        btn.classList.add('selected');
+        chosenRating = n; chosenLabel = label;
+      };
+      starRow2.appendChild(btn);
+    });
+
+    body.querySelector('#levelContinueBtn').onclick = ()=>{
+      if(pr.historyRecord){
+        pr.historyRecord.officialLevel = chosenLevel;
+        pr.historyRecord.perceivedRating = chosenRating;
+        pr.historyRecord.perceivedLabel = chosenLabel;
+        dbUpdateHistoryRating(pr.historyRecord).catch(e=>console.error(e));
+      }
+      pr.phase = 'done';
+      renderPruebaRun(document.getElementById('screenBody'));
+    };
+    return;
+  }
+
   if(pr.phase==='done'){
     const summary = pr.kind==='yoyo'
       ? `Pasadas: <strong>${pr.reachedLevel||0}</strong> · Tiempo: <strong>${fmtClock(pr.elapsedSec||0)}</strong>`
@@ -2786,50 +2880,35 @@ function renderPruebaRun(body){
         <div style="font-size:14px; font-weight:700;">${ICONS.trophySmall} ¡Prueba completa!</div>
         <p style="color:var(--ink-soft); font-size:12px; margin:3px 0 0;">${summary}</p>
       </div>
-      ${pr.kind==='yoyo' ? `
-      <div class="card pro-card" style="padding:8px 12px; display:flex; align-items:center; gap:8px;">
-        <span style="font-size:11.5px; font-weight:800; color:var(--ink-soft); flex-shrink:0;">Nivel final:</span>
-        <input type="text" id="officialLevelInput" placeholder="Ej: 14.8" style="flex:1; text-align:center; font-weight:700; padding:6px; font-size:14px;">
-      </div>` : ''}
+      ${pr.kind!=='yoyo' ? `
       <div class="card pro-card" style="padding:8px 10px;">
         <div class="eyebrow" style="text-align:center; font-size:10.5px;">¿Llegaste en tiempo?</div>
         <div id="starRow" style="display:grid; grid-template-columns:repeat(5,1fr); gap:4px; margin-top:6px;"></div>
-      </div>
+      </div>` : ''}
       <div style="display:flex; gap:8px;">
         <button class="btn btn-primary" id="prAgain" style="flex:1; margin-top:0; padding:10px;">${ICONS.repeat} Repetir</button>
         <button class="btn btn-secondary" id="prHome" style="flex:1; margin-top:0; padding:10px;">Inicio</button>
       </div>
     `;
-    const levelInput = body.querySelector('#officialLevelInput');
-    if(levelInput){
-      if(pr.historyRecord && pr.historyRecord.officialLevel) levelInput.value = pr.historyRecord.officialLevel;
-      const saveLevel = ()=>{
-        const val = levelInput.value.trim();
-        if(pr.historyRecord){
-          pr.historyRecord.officialLevel = val;
-          dbUpdateHistoryRating(pr.historyRecord).catch(e=>console.error(e));
-        }
-      };
-      levelInput.addEventListener('blur', saveLevel);
-      levelInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ levelInput.blur(); } });
-    }
     const starRow = body.querySelector('#starRow');
-    STAR_LABELS.forEach((label,i)=>{
-      const n = i+1;
-      const btn = document.createElement('button');
-      btn.className = 'opt-btn';
-      btn.style.cssText = 'flex-direction:column; padding:5px 2px; min-height:0; height:auto; gap:2px;';
-      btn.innerHTML = `<span style="font-size:12px; letter-spacing:-1px;">${'★'.repeat(n)}</span><span style="font-size:8.5px; line-height:1.05; font-weight:700;">${label}</span>`;
-      btn.onclick = ()=>{
-        starRow.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('selected'));
-        btn.classList.add('selected');
-        if(pr.historyRecord){
-          pr.historyRecord.perceivedRating = n; pr.historyRecord.perceivedLabel = label;
-          dbUpdateHistoryRating(pr.historyRecord).catch(e=>console.error(e));
-        }
-      };
-      starRow.appendChild(btn);
-    });
+    if(starRow){
+      STAR_LABELS.forEach((label,i)=>{
+        const n = i+1;
+        const btn = document.createElement('button');
+        btn.className = 'opt-btn';
+        btn.style.cssText = 'flex-direction:column; padding:5px 2px; min-height:0; height:auto; gap:2px;';
+        btn.innerHTML = `<span style="font-size:12px; letter-spacing:-1px;">${'★'.repeat(n)}</span><span style="font-size:8.5px; line-height:1.05; font-weight:700;">${label}</span>`;
+        btn.onclick = ()=>{
+          starRow.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('selected'));
+          btn.classList.add('selected');
+          if(pr.historyRecord){
+            pr.historyRecord.perceivedRating = n; pr.historyRecord.perceivedLabel = label;
+            dbUpdateHistoryRating(pr.historyRecord).catch(e=>console.error(e));
+          }
+        };
+        starRow.appendChild(btn);
+      });
+    }
     body.querySelector('#prAgain').onclick = ()=>{ pr.phase='ready'; render(); };
     body.querySelector('#prHome').onclick = ()=>{ state.prueba=null; state.screen='userHome'; render(); };
     return;
@@ -2934,12 +3013,13 @@ function finishPrueba(stopped){
   clearInterval(ariClockTimer);
   if(pr.audio){ try{ pr.audio.pause(); }catch(e){} pr.audio=null; }
   if(pr.kind==='yoyo' && pr.startTime) pr.elapsedSec = (Date.now()-pr.startTime)/1000;
-  pr.phase='done';
+  pr.phase = (pr.kind==='yoyo') ? 'levelSurvey' : 'done';
   // Esperamos un instante antes de soltar la orientación/pantalla completa: si se hace en el
   // mismo momento que suena el silbato final, el cambio de pantalla corta el audio a la mitad.
   setTimeout(()=>{
     try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
     try{ if(document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{}); }catch(e){}
+    try{ if(wakeLock){ wakeLock.release(); wakeLock = null; } }catch(e){}
   }, 400);
   const label = pr.kind==='yoyo' ? `ariet-pasadas${pr.reachedLevel||0}-${fmtClock(pr.elapsedSec||0)}` : `${pr.kind}-${pr.seconds}s`;
   const record = { date:new Date().toISOString(), email:state.userEmail, type:'prueba-'+label, series:1, topScore:1, bottomScore:1 };
