@@ -223,12 +223,20 @@
 
   /* immersive full-screen session mode */
   body.session-mode{padding-bottom:0; height:100dvh; height:100vh; overflow:hidden;}
-  body.force-landscape-lock{overflow:hidden;}
+  html.force-landscape-lock, body.force-landscape-lock{overflow:hidden !important; width:100% !important; height:100% !important; margin:0 !important;}
   body.force-landscape-lock #app{
-    position:fixed; top:0; left:0;
-    width:100vh; height:100vw;
-    transform-origin:top left;
-    transform:rotate(90deg) translateY(-100%);
+    position:fixed !important; top:0 !important; left:0 !important; margin:0 !important; padding:8px 10px !important;
+    width:100vh !important; height:100vw !important;
+    transform-origin:top left !important;
+    transform:rotate(90deg) translateY(-100%) !important;
+    box-sizing:border-box !important;
+    display:flex !important; flex-direction:column !important; overflow:hidden !important;
+  }
+  body.force-landscape-lock .video-wrap{flex:1 1 auto !important; min-height:0 !important; width:100% !important;}
+  body.force-landscape-lock .video-wrap video,
+  body.force-landscape-lock .video-wrap iframe,
+  body.force-landscape-lock .video-wrap > div{
+    width:100% !important; height:100% !important; max-width:100% !important; max-height:100% !important;
   }
   body.session-mode #app{max-width:100%; height:100%; padding:8px 10px calc(6px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box;}
   body.session-mode #screenBody{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; overflow:hidden;}
@@ -1827,9 +1835,13 @@ function isLandscape(){
 function checkRotateGuard(){
   const guard = document.getElementById('rotateGuard');
   const inSessionMode = document.body.classList.contains('session-mode');
+  const setLock = (on)=>{
+    document.body.classList.toggle('force-landscape-lock', on);
+    document.documentElement.classList.toggle('force-landscape-lock', on);
+  };
   if(!inSessionMode){
     if(guard) guard.style.display = 'none';
-    document.body.classList.remove('force-landscape-lock');
+    setLock(false);
     return;
   }
   let phase = null;
@@ -1842,17 +1854,18 @@ function checkRotateGuard(){
   if(preStart){
     // Todavía no arrancó el ejercicio (o ya terminó): acá sí pedimos girar el celular, una vez.
     if(guard) guard.style.display = isLandscape() ? 'none' : 'flex';
-    document.body.classList.remove('force-landscape-lock');
+    setLock(false);
   } else {
     // Ya arrancó: nunca más se pide girar. Si el teléfono físicamente está en vertical,
     // forzamos el mismo look horizontal con una transformación de pantalla, sin interrumpir
     // el ejercicio ni volver a preguntar nada hasta que termine.
     if(guard) guard.style.display = 'none';
-    document.body.classList.toggle('force-landscape-lock', !isLandscape());
+    setLock(!isLandscape());
   }
 }
 window.addEventListener('resize', checkRotateGuard);
 window.addEventListener('orientationchange', checkRotateGuard);
+setInterval(()=>{ if(document.body.classList.contains('session-mode')) checkRotateGuard(); }, 400);
 
 async function goFullscreenLandscape(){
   const isStandalone = (window.navigator.standalone === true) || window.matchMedia('(display-mode: standalone)').matches;
