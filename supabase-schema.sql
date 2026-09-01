@@ -138,3 +138,19 @@ create policy "public read gym_exercises" on gym_exercises for select using (tru
 create policy "public write gym_exercises" on gym_exercises for insert with check (true);
 create policy "public update gym_exercises" on gym_exercises for update using (true);
 create policy "public delete gym_exercises" on gym_exercises for delete using (true);
+
+-- Actualización: título personalizado por día en Rutina gym (ej: Lunes -> "Pecho")
+create table if not exists gym_day_titles (
+  email text not null,
+  day text not null,
+  title text,
+  primary key (email, day)
+);
+alter table gym_day_titles enable row level security;
+drop policy if exists "public read gym_day_titles" on gym_day_titles;
+drop policy if exists "public write gym_day_titles" on gym_day_titles;
+create policy "public read gym_day_titles" on gym_day_titles for select using (true);
+create policy "public write gym_day_titles" on gym_day_titles for all using (true) with check (true);
+
+-- Actualización: repeticiones por ejercicio en Rutina gym
+alter table gym_exercises add column if not exists reps text;
