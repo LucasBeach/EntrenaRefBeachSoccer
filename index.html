@@ -656,7 +656,7 @@ async function dbLoadGymDayTitles(email){
   try{
     const rows = await sb(`gym_day_titles?select=*&email=eq.${encodeURIComponent(email)}`);
     const map = {};
-    (rows||[]).forEach(r=>{ map[r.day] = r.title; });
+    (rows||[]).forEach(r=>{ map[r.day] = { title:r.title, completedAt:r.completed_at }; });
     return map;
   }catch(e){ console.error(e); return {}; }
 }
@@ -664,6 +664,25 @@ async function dbSetGymDayTitle(email, day, title){
   try{
     await sb('gym_day_titles', { method:'POST', body:{email,day,title}, prefer:'resolution=merge-duplicates,return=minimal' });
   }catch(e){ console.error(e); }
+}
+async function dbMarkDayCompleted(email, day){
+  const now = new Date().toISOString();
+  try{
+    await sb('gym_day_titles', { method:'POST', body:{email,day,completed_at:now}, prefer:'resolution=merge-duplicates,return=minimal' });
+  }catch(e){ console.error(e); }
+  return now;
+}
+function startOfWeek(){
+  const d = new Date();
+  const day = d.getDay(); // 0=domingo
+  const diffToMonday = (day===0) ? 6 : day-1;
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate()-diffToMonday);
+  return d;
+}
+function isDoneThisWeek(dayInfo){
+  if(!dayInfo || !dayInfo.completedAt) return false;
+  return new Date(dayInfo.completedAt) >= startOfWeek();
 }
 
 async function dbInsertHistory(rec){
@@ -1502,11 +1521,22 @@ async function renderGymHome(body){
   }
   body.innerHTML = `
     <h2 style="margin-bottom:4px;">Rutina gym</h2>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 10px;">Tu semana de un vistazo — se colorea el día que ya cumpliste.</p>
+    <div id="weekStrip" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:16px;"></div>
     <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 12px;">Elegí el día para ver tu rutina.</p>
     ${state.gymExercises.length===0 ? `<button class="btn btn-secondary" id="loadSampleBtn" style="margin-top:0;">${ICONS.dumbbell} Cargar rutina de definición (5 días)</button>` : ''}
     <div id="dayTabs" style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;"></div>
     <button class="btn btn-secondary" id="gymBack">Volver</button>
   `;
+  const weekStrip = body.querySelector('#weekStrip');
+  GYM_DAYS.forEach(d=>{
+    const done = isDoneThisWeek(state.gymDayTitles[d]);
+    const b = document.createElement('button');
+    b.style.cssText = `padding:9px 2px; border-radius:10px; border:none; font-size:11px; font-weight:800; cursor:pointer; ${done ? 'background:linear-gradient(150deg,var(--gym-steel),var(--gym-steel-dark)); color:#fff;' : 'background:#fff; color:var(--ink-soft);'}`;
+    b.textContent = d.slice(0,3);
+    b.onclick = ()=>{ state.gymDay = d; state.screen='gymDay'; render(); };
+    weekStrip.appendChild(b);
+  });
   const sampleBtn = body.querySelector('#loadSampleBtn');
   if(sampleBtn){
     sampleBtn.onclick = async ()=>{
@@ -1514,7 +1544,7 @@ async function renderGymHome(body){
       sampleBtn.disabled = true; sampleBtn.textContent = 'Cargando...';
       for(const day of Object.keys(SAMPLE_ROUTINE)){
         const def = SAMPLE_ROUTINE[day];
-        state.gymDayTitles[day] = def.title;
+        state.gymDayTitles[day] = { title: def.title, completedAt: null };
         await dbSetGymDayTitle(state.userEmail, day, def.title);
         for(const ex of def.exercises){
           const created = await dbCreateGymExercise(state.userEmail, day, ex.name, ex.equipment, '', ex.reps);
@@ -1526,7 +1556,7 @@ async function renderGymHome(body){
   }
   const tabs = body.querySelector('#dayTabs');
   GYM_DAYS.forEach(d=>{
-    const title = state.gymDayTitles[d];
+    const title = state.gymDayTitles[d]?.title;
     const b = document.createElement('button');
     b.className = 'card';
     b.style.cssText = `text-align:left; padding:12px 16px; margin:0; cursor:pointer; border:none; display:flex; flex-direction:column;`;
@@ -1540,18 +1570,26 @@ async function renderGymHome(body){
 async function renderGymDay(body){
   if(!state.gymExercises){ state.gymExercises = await dbLoadGymExercises(state.userEmail); }
   if(!state.gymDayTitles){ state.gymDayTitles = await dbLoadGymDayTitles(state.userEmail); }
+  const dayInfo = state.gymDayTitles[state.gymDay] || {};
+  const done = isDoneThisWeek(dayInfo);
   body.innerHTML = `
+    <button class="btn ${done ? 'btn-secondary' : 'btn-primary'}" id="markDoneBtn" style="margin-top:0; margin-bottom:14px;">${done ? '✔ Rutina realizada esta semana' : 'Rutina realizada'}</button>
     <h2 style="margin-bottom:2px;">${state.gymDay}</h2>
-    <input type="text" id="dayTitleInput" placeholder="Título del día (ej: Pecho)" value="${(state.gymDayTitles[state.gymDay]||'').replace(/"/g,'&quot;')}" style="font-family:'Baloo 2',sans-serif; font-weight:700; font-size:15px; color:var(--gym-steel-dark); border:none; background:transparent; padding:0 0 10px; width:100%;">
+    <input type="text" id="dayTitleInput" placeholder="Título del día (ej: Pecho)" value="${(dayInfo.title||'').replace(/"/g,'&quot;')}" style="font-family:'Baloo 2',sans-serif; font-weight:700; font-size:15px; color:var(--gym-steel-dark); border:none; background:transparent; padding:0 0 10px; width:100%;">
     <div id="gymList"></div>
     <button class="btn btn-primary" id="addExBtn">${ICONS.dumbbell} Agregar ejercicio</button>
     <div id="addExForm"></div>
     <button class="btn btn-secondary" id="gymDayBack">Volver a los días</button>
   `;
+  body.querySelector('#markDoneBtn').onclick = async ()=>{
+    const now = await dbMarkDayCompleted(state.userEmail, state.gymDay);
+    state.gymDayTitles[state.gymDay] = { ...dayInfo, completedAt: now };
+    renderGymDay(document.getElementById('screenBody'));
+  };
   const titleInput = body.querySelector('#dayTitleInput');
   const saveTitle = async ()=>{
     const val = titleInput.value.trim();
-    state.gymDayTitles[state.gymDay] = val;
+    state.gymDayTitles[state.gymDay] = { ...(state.gymDayTitles[state.gymDay]||{}), title: val };
     try{ await dbSetGymDayTitle(state.userEmail, state.gymDay, val); }catch(e){ console.error(e); }
   };
   titleInput.addEventListener('blur', saveTitle);
