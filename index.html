@@ -34,6 +34,10 @@
     --brick-dark:#943429;
     --mustard:#D99A2E;
     --mustard-dark:#9C6D17;
+    --gym-steel:#8A93A3;
+    --gym-steel-dark:#5B6472;
+    --gym-charcoal:#2E333B;
+    --gym-silver:#D8DCE2;
     --ink:#2E241A;
     --ink-soft:#6B5B47;
     --ink-faint:#B7A488;
@@ -99,6 +103,18 @@
   }
   .btn:active{transform:scale(0.97);}
   .btn-primary{background:linear-gradient(150deg,#E39572,var(--terracotta)); color:#fff; box-shadow:0 6px 16px rgba(217,124,82,0.32);}
+
+  /* Rutina gym — paleta metálica propia */
+  .gym-theme .btn-primary{background:linear-gradient(150deg,var(--gym-steel),var(--gym-steel-dark)); box-shadow:0 6px 16px rgba(46,51,59,0.28);}
+  .gym-theme .day-row-selected{background:linear-gradient(150deg,var(--gym-steel),var(--gym-steel-dark)) !important; color:#fff !important;}
+  .gym-theme .ex-thumb{background:linear-gradient(150deg,var(--gym-silver),var(--gym-steel)); color:var(--gym-charcoal);}
+  .gym-theme .pill{background:var(--gym-silver); color:var(--gym-charcoal);}
+  .gym-theme h2, .gym-theme .eyebrow{color:var(--gym-charcoal);}
+  .gym-theme .replay-btn{border-color:var(--gym-steel); color:var(--gym-steel-dark);}
+  .kg-stepper{display:flex; align-items:center; gap:10px;}
+  .kg-stepper .kg-val{font-family:'Baloo 2', sans-serif; font-size:22px; font-weight:800; color:var(--gym-charcoal); min-width:64px; text-align:center;}
+  .kg-btn{width:34px; height:34px; border-radius:50%; border:none; background:linear-gradient(150deg,var(--gym-silver),var(--gym-steel)); color:var(--gym-charcoal); font-size:18px; font-weight:800; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; box-shadow:0 3px 8px rgba(46,51,59,0.25);}
+  .kg-btn:active{transform:scale(0.94);}
   .btn-secondary{background:transparent; color:var(--ink-soft); border:1.5px solid var(--ink-faint);}
   .btn-sage{background:linear-gradient(150deg,#93B685,var(--sage)); color:#fff; box-shadow:0 6px 16px rgba(125,160,112,0.32);}
   .btn-ghost{background:none; color:var(--sea-dark); font-weight:700; border:none; padding:8px; margin-top:6px; font-family:'Nunito Sans'; font-size:13.5px; cursor:pointer;}
@@ -718,6 +734,7 @@ function render(){
   app.innerHTML = '';
   const immersive = state.screen==='session' || state.screen==='videoTestSession' || state.screen==='pruebaRun';
   document.body.classList.toggle('session-mode', immersive);
+  document.body.classList.toggle('gym-theme', state.screen==='gymHome' || state.screen==='gymDay');
   setTimeout(checkRotateGuard, 0);
 
   if(!immersive){
@@ -759,6 +776,7 @@ function render(){
     case 'userHome': renderUserHome(body); break;
     case 'myStats': renderMyStats(body); break;
     case 'gymHome': renderGymHome(body); break;
+    case 'gymDay': renderGymDay(body); break;
     case 'sectionConfig': renderSectionConfig(body); break;
     case 'session': renderSessionScreen(body); break;
     case 'summary': renderSummary(body); break;
@@ -1484,16 +1502,9 @@ async function renderGymHome(body){
   }
   body.innerHTML = `
     <h2 style="margin-bottom:4px;">Rutina gym</h2>
-    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 12px;">Tu rutina, ejercicio por ejercicio, con el peso que vas moviendo cada vez.</p>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 12px;">Elegí el día para ver tu rutina.</p>
     ${state.gymExercises.length===0 ? `<button class="btn btn-secondary" id="loadSampleBtn" style="margin-top:0;">${ICONS.dumbbell} Cargar rutina de definición (5 días)</button>` : ''}
     <div id="dayTabs" style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;"></div>
-    <div class="card pro-card" style="padding:10px 14px;">
-      <label style="font-size:11.5px;">Título de ${state.gymDay} (ej: Pecho)</label>
-      <input type="text" id="dayTitleInput" placeholder="Ej: Pecho" value="${(state.gymDayTitles[state.gymDay]||'').replace(/"/g,'&quot;')}">
-    </div>
-    <div id="gymList"></div>
-    <button class="btn btn-primary" id="addExBtn">${ICONS.dumbbell} Agregar ejercicio</button>
-    <div id="addExForm"></div>
     <button class="btn btn-secondary" id="gymBack">Volver</button>
   `;
   const sampleBtn = body.querySelector('#loadSampleBtn');
@@ -1515,15 +1526,28 @@ async function renderGymHome(body){
   }
   const tabs = body.querySelector('#dayTabs');
   GYM_DAYS.forEach(d=>{
-    const selected = d===state.gymDay;
     const title = state.gymDayTitles[d];
     const b = document.createElement('button');
-    b.style.cssText = `text-align:left; padding:10px 14px; border-radius:12px; border:none; cursor:pointer; ${selected ? 'background:var(--terracotta); color:#fff;' : 'background:#fff; color:var(--ink);'}`;
-    b.innerHTML = `<div style="font-weight:800; font-size:14px;">${d}</div>${title ? `<div style="font-size:11.5px; opacity:0.85; margin-top:1px;">${title}</div>` : ''}`;
-    b.onclick = ()=>{ state.gymDay = d; renderGymHome(document.getElementById('screenBody')); };
+    b.className = 'card';
+    b.style.cssText = `text-align:left; padding:12px 16px; margin:0; cursor:pointer; border:none; display:flex; flex-direction:column;`;
+    b.innerHTML = `<div style="font-weight:800; font-size:15px; color:var(--gym-charcoal);">${d}</div>${title ? `<div style="font-size:12px; color:var(--gym-steel-dark); margin-top:1px;">${title}</div>` : `<div style="font-size:11.5px; color:var(--ink-faint); margin-top:1px;">Sin título todavía</div>`}`;
+    b.onclick = ()=>{ state.gymDay = d; state.screen='gymDay'; render(); };
     tabs.appendChild(b);
   });
+  body.querySelector('#gymBack').onclick = ()=>{ state.screen='userHome'; render(); };
+}
 
+async function renderGymDay(body){
+  if(!state.gymExercises){ state.gymExercises = await dbLoadGymExercises(state.userEmail); }
+  if(!state.gymDayTitles){ state.gymDayTitles = await dbLoadGymDayTitles(state.userEmail); }
+  body.innerHTML = `
+    <h2 style="margin-bottom:2px;">${state.gymDay}</h2>
+    <input type="text" id="dayTitleInput" placeholder="Título del día (ej: Pecho)" value="${(state.gymDayTitles[state.gymDay]||'').replace(/"/g,'&quot;')}" style="font-family:'Baloo 2',sans-serif; font-weight:700; font-size:15px; color:var(--gym-steel-dark); border:none; background:transparent; padding:0 0 10px; width:100%;">
+    <div id="gymList"></div>
+    <button class="btn btn-primary" id="addExBtn">${ICONS.dumbbell} Agregar ejercicio</button>
+    <div id="addExForm"></div>
+    <button class="btn btn-secondary" id="gymDayBack">Volver a los días</button>
+  `;
   const titleInput = body.querySelector('#dayTitleInput');
   const saveTitle = async ()=>{
     const val = titleInput.value.trim();
@@ -1540,6 +1564,7 @@ async function renderGymHome(body){
   } else {
     dayExercises.forEach(ex=>{
       const lastLog = ex.logs.length ? ex.logs[ex.logs.length-1] : null;
+      const curKg = lastLog ? lastLog.kg : 0;
       const div = document.createElement('div');
       div.className = 'ex-item';
       div.style.flexDirection = 'column';
@@ -1547,26 +1572,36 @@ async function renderGymHome(body){
         <div style="display:flex; gap:12px; align-items:flex-start; width:100%;">
           <div class="ex-thumb">${ICONS.dumbbell}</div>
           <div class="ex-body">
-            <div class="name">${ex.name} ${ex.equipment ? `<span class="pill" style="background:#E4DCC8; color:var(--ink-soft);">${ex.equipment}</span>` : ''}</div>
-            <div class="answers">${ex.reps ? `${ex.reps} · ` : ''}${lastLog ? `Último: <b>${lastLog.kg} kg</b> · ${fmtDate(lastLog.date)}` : 'Sin registros todavía'}</div>
-            <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
-              <button class="replay-btn addKgBtn">${ICONS.chevron} Sumar kilos de hoy</button>
-              ${ex.logs.length>1 ? `<button class="replay-btn histBtn">Ver evolución</button>` : ''}
-              <button class="replay-btn editExBtn">${ICONS.gear} Editar</button>
+            <div class="name">${ex.name} ${ex.equipment ? `<span class="pill">${ex.equipment}</span>` : ''}</div>
+            <div class="answers">${ex.reps || ''}</div>
+            <div class="kg-stepper" style="margin-top:8px;">
+              <button class="kg-btn kgMinus">−</button>
+              <div class="kg-val">${curKg} kg</div>
+              <button class="kg-btn kgPlus">${ICONS.dumbbell}</button>
+              ${ex.logs.length>1 ? `<button class="replay-btn histBtn" style="margin-left:4px;">Evolución</button>` : ''}
             </div>
+            <button class="replay-btn editExBtn" style="margin-top:8px;">${ICONS.gear} Editar</button>
           </div>
           <button class="del-btn delExBtn">${ICONS.trash}</button>
         </div>
         <div class="histWrap" style="display:none; margin-top:10px; width:100%;"></div>
         <div class="editWrap" style="display:none; margin-top:10px; width:100%;"></div>
       `;
-      div.querySelector('.addKgBtn').onclick = async ()=>{
-        const val = prompt(`¿Cuántos kilos hiciste hoy en "${ex.name}"?`, lastLog ? lastLog.kg : '');
+      const addLogAndRefresh = async (newKg)=>{
+        await dbAddGymLog(ex, newKg);
+        renderGymDay(document.getElementById('screenBody'));
+      };
+      div.querySelector('.kgPlus').onclick = ()=> addLogAndRefresh(curKg + 2.5);
+      div.querySelector('.kgMinus').onclick = ()=>{
+        if(curKg<=0) return;
+        addLogAndRefresh(Math.max(0, curKg - 2.5));
+      };
+      div.querySelector('.kg-val').onclick = ()=>{
+        const val = prompt(`Kilos exactos para "${ex.name}":`, curKg);
         if(val===null || val.trim()==='') return;
         const num = Number(val.replace(',','.'));
         if(isNaN(num)) return;
-        await dbAddGymLog(ex, num);
-        renderGymHome(document.getElementById('screenBody'));
+        addLogAndRefresh(num);
       };
       const histBtn = div.querySelector('.histBtn');
       const histWrap = div.querySelector('.histWrap');
@@ -1574,7 +1609,7 @@ async function renderGymHome(body){
         histBtn.onclick = ()=>{
           if(histWrap.style.display==='none'){
             histWrap.innerHTML = [...ex.logs].reverse().map(l=>`
-              <div class="row-between" style="font-size:12.5px; padding:4px 0; border-bottom:1px solid #EFE2C8;">
+              <div class="row-between" style="font-size:12.5px; padding:4px 0; border-bottom:1px solid #E4E7EB;">
                 <span>${fmtDate(l.date)}</span><span style="font-weight:700;">${l.kg} kg</span>
               </div>`).join('');
             histWrap.style.display='block';
@@ -1606,7 +1641,7 @@ async function renderGymHome(body){
             };
             Object.assign(ex, updated);
             editWrap.style.display='none';
-            renderGymHome(document.getElementById('screenBody'));
+            renderGymDay(document.getElementById('screenBody'));
             try{ await dbUpdateGymExercise(ex.id, updated); }catch(e){ console.error(e); }
           };
           editWrap.querySelector('#eCancelGx').onclick = ()=>{ editWrap.style.display='none'; };
@@ -1617,7 +1652,7 @@ async function renderGymHome(body){
         if(!confirm(`¿Borrar "${ex.name}"?`)) return;
         try{ await dbDeleteGymExercise(ex.id); }catch(e){ console.error(e); }
         state.gymExercises = state.gymExercises.filter(e=>e.id!==ex.id);
-        renderGymHome(document.getElementById('screenBody'));
+        renderGymDay(document.getElementById('screenBody'));
       };
       list.appendChild(div);
     });
@@ -1649,10 +1684,10 @@ async function renderGymHome(body){
       const created = await dbCreateGymExercise(state.userEmail, state.gymDay, name, equipment, kg, reps);
       state.gymExercises.push(created);
       formWrap.innerHTML = '';
-      renderGymHome(document.getElementById('screenBody'));
+      renderGymDay(document.getElementById('screenBody'));
     };
   };
-  body.querySelector('#gymBack').onclick = ()=>{ state.screen='userHome'; render(); };
+  body.querySelector('#gymDayBack').onclick = ()=>{ state.screen='gymHome'; render(); };
 }
 
 function renderMyStats(body){
