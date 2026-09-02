@@ -38,6 +38,10 @@
     --gym-steel-dark:#5B6472;
     --gym-charcoal:#2E333B;
     --gym-silver:#D8DCE2;
+    --running-blue:#4FB6D6;
+    --running-blue-dark:#2E85A8;
+    --done-green:#5FA85D;
+    --done-green-dark:#3E7A3C;
     --ink:#2E241A;
     --ink-soft:#6B5B47;
     --ink-faint:#B7A488;
@@ -129,7 +133,7 @@
   .bar-fill{height:100%; border-radius:6px; background:linear-gradient(90deg,var(--sea),var(--sage));}
 
   .ex-item{background:var(--card); border-radius:16px; padding:13px 15px; margin-bottom:10px; box-shadow:var(--shadow-sm); display:flex; gap:12px; align-items:flex-start;}
-  .ex-thumb{width:44px;height:44px;border-radius:12px;background:linear-gradient(150deg,#3D3125,#5A4A38); display:flex;align-items:center;justify-content:center; flex-shrink:0; color:#F6EAD6;}
+  .ex-thumb{width:44px;height:44px;border-radius:12px;background:linear-gradient(150deg,#3D3125,#5A4A38); display:flex;align-items:center;justify-content:center; flex-shrink:0; color:#F6EAD6; padding:0; font:inherit;}
   .ex-body{flex:1; min-width:0;}
   .ex-item .name{font-weight:700; font-size:14px;}
   .ex-item .answers{font-size:12px; margin-top:4px; color:var(--ink-soft);}
@@ -629,7 +633,7 @@ async function dbLoadVideoTestResults(testId){
 }
 
 function gymExFromRow(r){
-  return { id:r.id, email:r.email, day:r.day, name:r.name, equipment:r.equipment, reps:r.reps||'', logs:r.logs||[] };
+  return { id:r.id, email:r.email, day:r.day, name:r.name, equipment:r.equipment, reps:r.reps||'', logs:r.logs||[], done:!!r.done };
 }
 async function dbLoadGymExercises(email){
   try{
@@ -649,6 +653,7 @@ async function dbUpdateGymExercise(id, fields){
   if('name' in fields) payload.name = fields.name;
   if('equipment' in fields) payload.equipment = fields.equipment;
   if('reps' in fields) payload.reps = fields.reps;
+  if('done' in fields) payload.done = fields.done;
   try{ await sb(`gym_exercises?id=eq.${encodeURIComponent(id)}`, { method:'PATCH', body:payload, prefer:'return=minimal' }); }catch(e){ console.error(e); }
 }
 async function dbAddGymLog(ex, kg){
@@ -678,6 +683,16 @@ async function dbMarkDayCompleted(email, day){
     await sb('gym_day_titles', { method:'POST', body:{email,day,completed_at:now}, prefer:'resolution=merge-duplicates,return=minimal' });
   }catch(e){ console.error(e); }
   return now;
+}
+async function dbAddRunningLog(email, date, km, minutes){
+  const payload = { email, date, km:Number(km), minutes:Number(minutes) };
+  try{ await sb('running_logs', { method:'POST', body:payload, prefer:'return=minimal' }); }catch(e){ console.error(e); }
+}
+async function dbLoadRunningLogs(email){
+  try{
+    const rows = await sb(`running_logs?select=*&email=eq.${encodeURIComponent(email)}&order=date.desc`);
+    return rows||[];
+  }catch(e){ console.error(e); return []; }
 }
 function startOfWeek(){
   const d = new Date();
@@ -1522,6 +1537,7 @@ const GYM_EQUIPMENT = ['Barra','Mancuernas','Polea','Cuerdas','Máquina','Peso c
 async function renderGymHome(body){
   if(!state.gymExercises){ state.gymExercises = await dbLoadGymExercises(state.userEmail); }
   if(!state.gymDayTitles){ state.gymDayTitles = await dbLoadGymDayTitles(state.userEmail); }
+  if(!state.runningLogs){ state.runningLogs = await dbLoadRunningLogs(state.userEmail); }
   if(!state.gymDay){
     const jsDay = new Date().getDay(); // 0=domingo
     state.gymDay = GYM_DAYS[(jsDay+6)%7];
@@ -1529,21 +1545,67 @@ async function renderGymHome(body){
   body.innerHTML = `
     <h2 style="margin-bottom:4px;">Rutina gym</h2>
     <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 10px;">Tu semana de un vistazo — se colorea el día que ya cumpliste.</p>
-    <div id="weekStrip" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:16px;"></div>
+    <div id="weekStrip" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:8px;"></div>
+    <p style="font-size:11.5px; color:var(--running-blue-dark); margin:0 0 4px; font-weight:700;">Running — tocá un día para anotar tu salida</p>
+    <div id="runStrip" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:16px;"></div>
     <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 12px;">Elegí el día para ver tu rutina.</p>
     ${state.gymExercises.length===0 ? `<button class="btn btn-secondary" id="loadSampleBtn" style="margin-top:0;">${ICONS.dumbbell} Cargar rutina de definición (5 días)</button>` : ''}
     <div id="dayTabs" style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;"></div>
+    <div class="eyebrow" style="margin-bottom:6px;">🏃 Running</div>
+    <div id="runningHistory" style="margin-bottom:16px;"></div>
     <button class="btn btn-secondary" id="gymBack">Volver</button>
   `;
   const weekStrip = body.querySelector('#weekStrip');
   GYM_DAYS.forEach(d=>{
     const done = isDoneThisWeek(state.gymDayTitles[d]);
     const b = document.createElement('button');
-    b.style.cssText = `padding:9px 2px; border-radius:10px; border:none; font-size:11px; font-weight:800; cursor:pointer; ${done ? 'background:linear-gradient(150deg,var(--gym-steel),var(--gym-steel-dark)); color:#fff;' : 'background:#fff; color:var(--ink-soft);'}`;
+    b.style.cssText = `padding:9px 2px; border-radius:10px; border:none; font-size:11px; font-weight:800; cursor:pointer; ${done ? 'background:linear-gradient(150deg,var(--done-green),var(--done-green-dark)); color:#fff;' : 'background:#fff; color:var(--ink-soft);'}`;
     b.textContent = d.slice(0,3);
     b.onclick = ()=>{ state.gymDay = d; state.screen='gymDay'; render(); };
     weekStrip.appendChild(b);
   });
+
+  function dateForWeekday(idx){ // idx 0=Lunes..6=Domingo
+    const d = startOfWeek();
+    d.setDate(d.getDate()+idx);
+    return d;
+  }
+  function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+
+  const runStrip = body.querySelector('#runStrip');
+  GYM_DAYS.forEach((d,idx)=>{
+    const dayDate = dateForWeekday(idx);
+    const ran = state.runningLogs.some(r=> sameDay(new Date(r.date), dayDate));
+    const b = document.createElement('button');
+    b.style.cssText = `padding:9px 2px; border-radius:10px; border:none; font-size:11px; font-weight:800; cursor:pointer; ${ran ? 'background:linear-gradient(150deg,var(--running-blue),var(--running-blue-dark)); color:#fff;' : 'background:#fff; color:var(--running-blue-dark);'}`;
+    b.textContent = d.slice(0,3);
+    b.onclick = async ()=>{
+      const km = prompt(`¿Cuántos kilómetros corriste el ${d}?`);
+      if(km===null || km.trim()==='') return;
+      const kmNum = Number(km.replace(',','.'));
+      if(isNaN(kmNum)) return;
+      const min = prompt('¿Cuántos minutos te llevó?');
+      if(min===null || min.trim()==='') return;
+      const minNum = Number(min.replace(',','.'));
+      if(isNaN(minNum)) return;
+      await dbAddRunningLog(state.userEmail, dayDate.toISOString(), kmNum, minNum);
+      state.runningLogs = await dbLoadRunningLogs(state.userEmail);
+      renderGymHome(document.getElementById('screenBody'));
+    };
+    runStrip.appendChild(b);
+  });
+
+  const runHist = body.querySelector('#runningHistory');
+  if(state.runningLogs.length===0){
+    runHist.innerHTML = `<div class="empty" style="padding:16px;">Todavía no registraste ninguna salida a correr.</div>`;
+  } else {
+    runHist.innerHTML = state.runningLogs.map(r=>`
+      <div class="row-between" style="padding:8px 4px; border-bottom:1px solid #E4E7EB; font-size:13px;">
+        <span>${fmtDate(r.date)}</span>
+        <span style="font-weight:700; color:var(--running-blue-dark);">${r.km} km · ${r.minutes} min</span>
+      </div>`).join('');
+  }
+
   const sampleBtn = body.querySelector('#loadSampleBtn');
   if(sampleBtn){
     sampleBtn.onclick = async ()=>{
@@ -1580,7 +1642,7 @@ async function renderGymDay(body){
   const dayInfo = state.gymDayTitles[state.gymDay] || {};
   const done = isDoneThisWeek(dayInfo);
   body.innerHTML = `
-    <button class="btn ${done ? 'btn-secondary' : 'btn-primary'}" id="markDoneBtn" style="margin-top:0; margin-bottom:14px;">${done ? '✔ Rutina realizada esta semana' : 'Rutina realizada'}</button>
+    <button class="btn" id="markDoneBtn" style="margin-top:0; margin-bottom:14px; ${done ? 'background:linear-gradient(150deg,var(--done-green),var(--done-green-dark)); color:#fff;' : ''}">${done ? '✔ Rutina realizada esta semana' : 'Rutina realizada'}</button>
     <h2 style="margin-bottom:2px;">${state.gymDay}</h2>
     <input type="text" id="dayTitleInput" placeholder="Título del día (ej: Pecho)" value="${(dayInfo.title||'').replace(/"/g,'&quot;')}" style="font-family:'Baloo 2',sans-serif; font-weight:700; font-size:15px; color:var(--gym-steel-dark); border:none; background:transparent; padding:0 0 10px; width:100%;">
     <div id="gymList"></div>
@@ -1591,6 +1653,14 @@ async function renderGymDay(body){
   body.querySelector('#markDoneBtn').onclick = async ()=>{
     const now = await dbMarkDayCompleted(state.userEmail, state.gymDay);
     state.gymDayTitles[state.gymDay] = { ...dayInfo, completedAt: now };
+    // Al marcar la rutina como hecha, reseteamos los ejercicios tildados para la próxima vez.
+    const dayExercises = state.gymExercises.filter(e=>e.day===state.gymDay);
+    for(const ex of dayExercises){
+      if(ex.done){
+        ex.done = false;
+        try{ await dbUpdateGymExercise(ex.id, {done:false}); }catch(e){ console.error(e); }
+      }
+    }
     renderGymDay(document.getElementById('screenBody'));
   };
   const titleInput = body.querySelector('#dayTitleInput');
@@ -1615,7 +1685,7 @@ async function renderGymDay(body){
       div.style.flexDirection = 'column';
       div.innerHTML = `
         <div style="display:flex; gap:12px; align-items:flex-start; width:100%;">
-          <div class="ex-thumb">${ICONS.dumbbell}</div>
+          <button class="ex-thumb doneToggle" style="border:none; cursor:pointer; ${ex.done ? 'background:linear-gradient(150deg,var(--done-green),var(--done-green-dark)); color:#fff;' : ''}">${ICONS.dumbbell}</button>
           <div class="ex-body">
             <div class="name">${ex.name} ${ex.equipment ? `<span class="pill">${ex.equipment}</span>` : ''}</div>
             <div class="answers">${ex.reps || ''}</div>
@@ -1632,6 +1702,11 @@ async function renderGymDay(body){
         <div class="histWrap" style="display:none; margin-top:10px; width:100%;"></div>
         <div class="editWrap" style="display:none; margin-top:10px; width:100%;"></div>
       `;
+      div.querySelector('.doneToggle').onclick = async ()=>{
+        ex.done = !ex.done;
+        renderGymDay(document.getElementById('screenBody'));
+        try{ await dbUpdateGymExercise(ex.id, {done: ex.done}); }catch(e){ console.error(e); }
+      };
       const addLogAndRefresh = async (newKg)=>{
         await dbAddGymLog(ex, newKg);
         renderGymDay(document.getElementById('screenBody'));

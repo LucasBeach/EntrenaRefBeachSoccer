@@ -154,3 +154,22 @@ create policy "public write gym_day_titles" on gym_day_titles for all using (tru
 
 -- Actualización: repeticiones por ejercicio en Rutina gym
 alter table gym_exercises add column if not exists reps text;
+
+-- Actualización: marcar cuándo se completó la rutina de cada día (para el estado semanal)
+alter table gym_day_titles add column if not exists completed_at timestamptz;
+
+-- Actualización: marcar ejercicios hechos (se resetea al tocar "Rutina realizada") + registro de Running
+alter table gym_exercises add column if not exists done boolean default false;
+
+create table if not exists running_logs (
+  id bigint generated always as identity primary key,
+  email text not null,
+  date timestamptz not null default now(),
+  km numeric,
+  minutes numeric
+);
+alter table running_logs enable row level security;
+drop policy if exists "public read running_logs" on running_logs;
+drop policy if exists "public write running_logs" on running_logs;
+create policy "public read running_logs" on running_logs for select using (true);
+create policy "public write running_logs" on running_logs for insert with check (true);
