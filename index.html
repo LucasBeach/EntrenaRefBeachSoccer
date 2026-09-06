@@ -258,6 +258,7 @@
     transition:none !important;
   }
   #app{transition:none !important;}
+  .video-wrap, .video-wrap video, .video-wrap iframe, .video-wrap > div{transition:none !important;}
   body.force-landscape-lock .video-wrap{flex:1 1 auto !important; min-height:0 !important; width:100% !important;}
   body.force-landscape-lock .video-wrap video,
   body.force-landscape-lock .video-wrap iframe,
@@ -298,6 +299,13 @@
   }
   .rotate-overlay h2{margin:16px 0 6px;}
   .rotate-overlay p{color:var(--ink-soft); font-size:14px; max-width:280px;}
+  #recoveryClock{
+    position:fixed; top:calc(10px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:70;
+    background:rgba(42,33,24,0.78); color:#fff; font-family:'Baloo 2', sans-serif; font-weight:800; font-size:15px;
+    padding:6px 16px; border-radius:20px; letter-spacing:.02em;
+  }
+  #recoveryClock.urgent{background:rgba(194,76,63,0.92); animation:pulseUrgent 0.6s ease-in-out infinite;}
+  @keyframes pulseUrgent{ 0%,100%{transform:translateX(-50%) scale(1);} 50%{transform:translateX(-50%) scale(1.08);} }
 
   @media (orientation: landscape){
     body.session-mode .session-header{margin-bottom:6px;}
@@ -335,6 +343,7 @@
   <h2>Volvé a girar el celular</h2>
   <p>El ejercicio sigue en curso. En cuanto vuelvas a horizontal, seguís justo donde quedaste.</p>
 </div>
+<div id="recoveryClock" style="display:none;"></div>
 
 <script>
 const TOP_OPTS = [
@@ -775,7 +784,7 @@ function render(){
   app.innerHTML = '';
   const immersive = state.screen==='session' || state.screen==='videoTestSession' || state.screen==='pruebaRun';
   document.body.classList.toggle('session-mode', immersive);
-  document.body.classList.toggle('gym-theme', state.screen==='gymHome' || state.screen==='gymDay');
+  document.body.classList.toggle('gym-theme', ['gymHome','gymDay','gymRoutinePicker','gymCustomBuilder'].includes(state.screen));
   setTimeout(checkRotateGuard, 0);
 
   if(!immersive){
@@ -818,6 +827,8 @@ function render(){
     case 'myStats': renderMyStats(body); break;
     case 'gymHome': renderGymHome(body); break;
     case 'gymDay': renderGymDay(body); break;
+    case 'gymRoutinePicker': renderGymRoutinePicker(body); break;
+    case 'gymCustomBuilder': renderGymCustomBuilder(body); break;
     case 'sectionConfig': renderSectionConfig(body); break;
     case 'session': renderSessionScreen(body); break;
     case 'summary': renderSummary(body); break;
@@ -1485,54 +1496,186 @@ function prettyPruebaType(h){
 
 const GYM_DAYS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 
-const SAMPLE_ROUTINE = {
-  'Lunes': { title:'Pecho + Tríceps + Core', exercises:[
-    {name:'Press banca (barra o Smith)', equipment:'Barra', reps:'4×6–10'},
-    {name:'Press inclinado con mancuernas', equipment:'Mancuernas', reps:'3×8–12'},
-    {name:'Pec Deck o cruce de poleas', equipment:'Polea', reps:'3×12–15'},
-    {name:'Extensión de tríceps en polea con cuerda', equipment:'Cuerdas', reps:'3×10–15'},
-    {name:'Extensión de tríceps por encima de la cabeza', equipment:'Polea', reps:'2×12–15'},
-    {name:'Core: Dead Bug + Bear Crawl Drag', equipment:'Peso corporal', reps:'3 rondas'},
-  ]},
-  'Martes': { title:'Espalda + Bíceps + Core', exercises:[
-    {name:'Jalón al pecho', equipment:'Polea', reps:'4×8–12'},
-    {name:'Remo en polea baja', equipment:'Polea', reps:'4×8–12'},
-    {name:'Remo unilateral con mancuerna', equipment:'Mancuernas', reps:'3×10–12 por lado'},
-    {name:'Pullover en polea', equipment:'Polea', reps:'2×12–15'},
-    {name:'Curl con barra Z', equipment:'Barra', reps:'3×8–12'},
-    {name:'Curl martillo', equipment:'Mancuernas', reps:'2×10–12'},
-    {name:'Core: Bear Plank Shoulder Tap + bicicleta', equipment:'Peso corporal', reps:'3 rondas'},
-  ]},
-  'Miércoles': { title:'Hombros + Brazos + Core', exercises:[
-    {name:'Press militar', equipment:'Barra', reps:'3×6–10'},
-    {name:'Elevaciones laterales', equipment:'Mancuernas', reps:'4×12–20'},
-    {name:'Face Pull', equipment:'Cuerdas', reps:'3×12–20'},
-    {name:'Reverse Pec Deck / pájaros', equipment:'Máquina', reps:'3×12–15'},
-    {name:'Curl inclinado', equipment:'Mancuernas', reps:'3×10–12'},
-    {name:'Tríceps en polea', equipment:'Polea', reps:'3×10–15'},
-    {name:'Core: Plancha lateral + Body Saw', equipment:'Peso corporal', reps:'3 rondas'},
-  ]},
-  'Jueves': { title:'Pecho + Espalda + Core', exercises:[
-    {name:'Chest Press', equipment:'Máquina', reps:'3×8–12'},
-    {name:'Remo en máquina', equipment:'Máquina', reps:'3×8–12'},
-    {name:'Press inclinado en máquina', equipment:'Máquina', reps:'3×10–12'},
-    {name:'Jalón agarre estrecho', equipment:'Polea', reps:'3×10–12'},
-    {name:'Pec Deck', equipment:'Máquina', reps:'2×12–15'},
-    {name:'Face Pull', equipment:'Cuerdas', reps:'2×15–20'},
-    {name:'Core: Mountain Climbers lentos + puente unilateral', equipment:'Peso corporal', reps:'3 rondas'},
-  ]},
-  'Viernes': { title:'Brazos + Core', exercises:[
-    {name:'Curl barra Z (superserie 1)', equipment:'Barra', reps:'3×8–12'},
-    {name:'Press cerrado (superserie 1)', equipment:'Barra', reps:'3×8–12'},
-    {name:'Curl inclinado (superserie 2)', equipment:'Mancuernas', reps:'3×10–12'},
-    {name:'Tríceps cuerda (superserie 2)', equipment:'Cuerdas', reps:'3×10–15'},
-    {name:'Curl martillo (superserie 3)', equipment:'Mancuernas', reps:'3×10–12'},
-    {name:'Tríceps por encima de la cabeza (superserie 3)', equipment:'Cuerdas', reps:'3×12–15'},
-    {name:'Core: Pullover + elevación de piernas + Russian twist + Body Saw', equipment:'Peso corporal', reps:'3 rondas'},
-  ]},
+const PRELOADED_ROUTINES = {
+  'Definición': {
+    desc: 'Mantener masa y fuerza mientras bajás grasa. 5 días, tren superior + core.',
+    days: {
+      'Lunes': { title:'Pecho + Tríceps + Core', exercises:[
+        {name:'Press banca (barra o Smith)', equipment:'Barra', reps:'4×6–10'},
+        {name:'Press inclinado con mancuernas', equipment:'Mancuernas', reps:'3×8–12'},
+        {name:'Pec Deck o cruce de poleas', equipment:'Polea', reps:'3×12–15'},
+        {name:'Extensión de tríceps en polea con cuerda', equipment:'Cuerdas', reps:'3×10–15'},
+        {name:'Extensión de tríceps por encima de la cabeza', equipment:'Polea', reps:'2×12–15'},
+        {name:'Core: Dead Bug + Bear Crawl Drag', equipment:'Peso corporal', reps:'3 rondas'},
+      ]},
+      'Martes': { title:'Espalda + Bíceps + Core', exercises:[
+        {name:'Jalón al pecho', equipment:'Polea', reps:'4×8–12'},
+        {name:'Remo en polea baja', equipment:'Polea', reps:'4×8–12'},
+        {name:'Remo unilateral con mancuerna', equipment:'Mancuernas', reps:'3×10–12 por lado'},
+        {name:'Pullover en polea', equipment:'Polea', reps:'2×12–15'},
+        {name:'Curl con barra Z', equipment:'Barra', reps:'3×8–12'},
+        {name:'Curl martillo', equipment:'Mancuernas', reps:'2×10–12'},
+        {name:'Core: Bear Plank Shoulder Tap + bicicleta', equipment:'Peso corporal', reps:'3 rondas'},
+      ]},
+      'Miércoles': { title:'Hombros + Brazos + Core', exercises:[
+        {name:'Press militar', equipment:'Barra', reps:'3×6–10'},
+        {name:'Elevaciones laterales', equipment:'Mancuernas', reps:'4×12–20'},
+        {name:'Face Pull', equipment:'Cuerdas', reps:'3×12–20'},
+        {name:'Reverse Pec Deck / pájaros', equipment:'Máquina', reps:'3×12–15'},
+        {name:'Curl inclinado', equipment:'Mancuernas', reps:'3×10–12'},
+        {name:'Tríceps en polea', equipment:'Polea', reps:'3×10–15'},
+        {name:'Core: Plancha lateral + Body Saw', equipment:'Peso corporal', reps:'3 rondas'},
+      ]},
+      'Jueves': { title:'Pecho + Espalda + Core', exercises:[
+        {name:'Chest Press', equipment:'Máquina', reps:'3×8–12'},
+        {name:'Remo en máquina', equipment:'Máquina', reps:'3×8–12'},
+        {name:'Press inclinado en máquina', equipment:'Máquina', reps:'3×10–12'},
+        {name:'Jalón agarre estrecho', equipment:'Polea', reps:'3×10–12'},
+        {name:'Pec Deck', equipment:'Máquina', reps:'2×12–15'},
+        {name:'Face Pull', equipment:'Cuerdas', reps:'2×15–20'},
+        {name:'Core: Mountain Climbers lentos + puente unilateral', equipment:'Peso corporal', reps:'3 rondas'},
+      ]},
+      'Viernes': { title:'Brazos + Core', exercises:[
+        {name:'Curl barra Z (superserie 1)', equipment:'Barra', reps:'3×8–12'},
+        {name:'Press cerrado (superserie 1)', equipment:'Barra', reps:'3×8–12'},
+        {name:'Curl inclinado (superserie 2)', equipment:'Mancuernas', reps:'3×10–12'},
+        {name:'Tríceps cuerda (superserie 2)', equipment:'Cuerdas', reps:'3×10–15'},
+        {name:'Curl martillo (superserie 3)', equipment:'Mancuernas', reps:'3×10–12'},
+        {name:'Tríceps por encima de la cabeza (superserie 3)', equipment:'Cuerdas', reps:'3×12–15'},
+        {name:'Core: Pullover + elevación de piernas + Russian twist + Body Saw', equipment:'Peso corporal', reps:'3 rondas'},
+      ]},
+    }
+  },
+  'Hipertrofia': {
+    desc: 'Volumen más alto, 8–15 reps, para crecer. 5 días, tren superior + core.',
+    days: {
+      'Lunes': { title:'Pecho + Tríceps', exercises:[
+        {name:'Press banca', equipment:'Barra', reps:'4×8–12'},
+        {name:'Press inclinado con mancuernas', equipment:'Mancuernas', reps:'4×10–12'},
+        {name:'Aperturas en polea', equipment:'Polea', reps:'3×12–15'},
+        {name:'Fondos en máquina', equipment:'Máquina', reps:'3×10–12'},
+        {name:'Extensión de tríceps en polea con cuerda', equipment:'Cuerdas', reps:'3×12–15'},
+        {name:'Core: Plancha', equipment:'Peso corporal', reps:'3×40s'},
+      ]},
+      'Martes': { title:'Espalda + Bíceps', exercises:[
+        {name:'Jalón al pecho', equipment:'Polea', reps:'4×8–12'},
+        {name:'Remo con barra', equipment:'Barra', reps:'4×8–12'},
+        {name:'Remo en polea', equipment:'Polea', reps:'3×10–12'},
+        {name:'Curl con mancuernas', equipment:'Mancuernas', reps:'3×10–12'},
+        {name:'Curl en polea', equipment:'Polea', reps:'3×12–15'},
+        {name:'Core: Elevación de piernas', equipment:'Peso corporal', reps:'3×15'},
+      ]},
+      'Miércoles': { title:'Hombros', exercises:[
+        {name:'Press militar con mancuernas', equipment:'Mancuernas', reps:'4×8–12'},
+        {name:'Elevaciones laterales', equipment:'Mancuernas', reps:'4×12–15'},
+        {name:'Elevaciones posteriores', equipment:'Mancuernas', reps:'3×12–15'},
+        {name:'Press Arnold', equipment:'Mancuernas', reps:'3×10–12'},
+        {name:'Face Pull', equipment:'Cuerdas', reps:'3×15'},
+        {name:'Core: Russian twist', equipment:'Peso corporal', reps:'3×20'},
+      ]},
+      'Jueves': { title:'Pecho + Espalda (volumen)', exercises:[
+        {name:'Press inclinado con barra', equipment:'Barra', reps:'4×8–10'},
+        {name:'Jalón agarre ancho', equipment:'Polea', reps:'4×10–12'},
+        {name:'Pec Deck', equipment:'Máquina', reps:'3×12–15'},
+        {name:'Remo unilateral con mancuerna', equipment:'Mancuernas', reps:'3×10–12 por lado'},
+        {name:'Pullover en polea', equipment:'Polea', reps:'3×12–15'},
+        {name:'Core: Mountain climbers', equipment:'Peso corporal', reps:'3×30s'},
+      ]},
+      'Viernes': { title:'Brazos', exercises:[
+        {name:'Curl con barra Z', equipment:'Barra', reps:'4×10–12'},
+        {name:'Press francés', equipment:'Barra', reps:'4×10–12'},
+        {name:'Curl martillo', equipment:'Mancuernas', reps:'3×10–12'},
+        {name:'Tríceps cuerda', equipment:'Cuerdas', reps:'3×12–15'},
+        {name:'Curl concentrado', equipment:'Mancuernas', reps:'3×12–15'},
+        {name:'Core: Body Saw', equipment:'Peso corporal', reps:'3×30s'},
+      ]},
+    }
+  },
+  'Mantenimiento': {
+    desc: 'Sostener lo que ya tenés con menos volumen. 3 días full body.',
+    days: {
+      'Lunes': { title:'Full body A', exercises:[
+        {name:'Press banca', equipment:'Barra', reps:'3×8–10'},
+        {name:'Remo en polea', equipment:'Polea', reps:'3×8–10'},
+        {name:'Press militar con mancuernas', equipment:'Mancuernas', reps:'3×10–12'},
+        {name:'Curl con barra', equipment:'Barra', reps:'2×10–12'},
+        {name:'Core: Plancha', equipment:'Peso corporal', reps:'2×40s'},
+      ]},
+      'Miércoles': { title:'Full body B', exercises:[
+        {name:'Jalón al pecho', equipment:'Polea', reps:'3×8–10'},
+        {name:'Press inclinado con mancuernas', equipment:'Mancuernas', reps:'3×10–12'},
+        {name:'Elevaciones laterales', equipment:'Mancuernas', reps:'3×12–15'},
+        {name:'Tríceps en polea', equipment:'Polea', reps:'2×12–15'},
+        {name:'Core: Elevación de piernas', equipment:'Peso corporal', reps:'2×15'},
+      ]},
+      'Viernes': { title:'Full body C', exercises:[
+        {name:'Remo con barra', equipment:'Barra', reps:'3×8–10'},
+        {name:'Press cerrado', equipment:'Barra', reps:'3×8–10'},
+        {name:'Curl martillo', equipment:'Mancuernas', reps:'2×10–12'},
+        {name:'Face Pull', equipment:'Cuerdas', reps:'2×15'},
+        {name:'Core: Russian twist', equipment:'Peso corporal', reps:'2×20'},
+      ]},
+    }
+  },
+  'Fuerza': {
+    desc: 'Pocas repeticiones, peso alto, foco en levantamientos base. 4 días.',
+    days: {
+      'Lunes': { title:'Press banca (principal)', exercises:[
+        {name:'Press banca', equipment:'Barra', reps:'5×3–5'},
+        {name:'Press inclinado con mancuernas', equipment:'Mancuernas', reps:'3×6–8'},
+        {name:'Fondos', equipment:'Máquina', reps:'3×6–8'},
+        {name:'Tríceps en polea', equipment:'Polea', reps:'3×8–10'},
+      ]},
+      'Martes': { title:'Tirón (principal)', exercises:[
+        {name:'Remo con barra', equipment:'Barra', reps:'5×3–5'},
+        {name:'Jalón al pecho', equipment:'Polea', reps:'3×6–8'},
+        {name:'Curl con barra', equipment:'Barra', reps:'3×6–8'},
+        {name:'Face Pull', equipment:'Cuerdas', reps:'3×10'},
+      ]},
+      'Jueves': { title:'Press militar (principal)', exercises:[
+        {name:'Press militar', equipment:'Barra', reps:'5×3–5'},
+        {name:'Elevaciones laterales', equipment:'Mancuernas', reps:'3×8–10'},
+        {name:'Press cerrado', equipment:'Barra', reps:'3×6–8'},
+        {name:'Tríceps cuerda', equipment:'Cuerdas', reps:'3×8–10'},
+      ]},
+      'Viernes': { title:'Accesorios', exercises:[
+        {name:'Peso muerto rumano', equipment:'Barra', reps:'4×5–6'},
+        {name:'Remo unilateral con mancuerna', equipment:'Mancuernas', reps:'3×6–8 por lado'},
+        {name:'Curl martillo', equipment:'Mancuernas', reps:'3×8–10'},
+        {name:'Core: Plancha con peso', equipment:'Peso corporal', reps:'3×30s'},
+      ]},
+    }
+  },
+  'Resistencia': {
+    desc: 'Circuitos y superseries, muchas repeticiones, descansos cortos. 3 días.',
+    days: {
+      'Lunes': { title:'Circuito superior A', exercises:[
+        {name:'Press banca con mancuernas (superserie)', equipment:'Mancuernas', reps:'3×15'},
+        {name:'Remo con mancuerna (superserie)', equipment:'Mancuernas', reps:'3×15'},
+        {name:'Press militar (superserie)', equipment:'Mancuernas', reps:'3×15'},
+        {name:'Jalón en polea (superserie)', equipment:'Polea', reps:'3×15'},
+        {name:'Core: Mountain climbers', equipment:'Peso corporal', reps:'3×40s'},
+      ]},
+      'Miércoles': { title:'Circuito superior B', exercises:[
+        {name:'Curl con mancuerna (superserie)', equipment:'Mancuernas', reps:'3×20'},
+        {name:'Tríceps cuerda (superserie)', equipment:'Cuerdas', reps:'3×20'},
+        {name:'Elevaciones laterales (superserie)', equipment:'Mancuernas', reps:'3×15'},
+        {name:'Face Pull (superserie)', equipment:'Cuerdas', reps:'3×15'},
+        {name:'Core: Burpees', equipment:'Peso corporal', reps:'3×15'},
+      ]},
+      'Viernes': { title:'Circuito full body', exercises:[
+        {name:'Press banca', equipment:'Barra', reps:'3×15'},
+        {name:'Remo en polea', equipment:'Polea', reps:'3×15'},
+        {name:'Press militar con mancuernas', equipment:'Mancuernas', reps:'3×15'},
+        {name:'Curl con barra', equipment:'Barra', reps:'3×15'},
+        {name:'Core: Plancha + Russian twist', equipment:'Peso corporal', reps:'3 rondas'},
+      ]},
+    }
+  },
 };
 
 const GYM_EQUIPMENT = ['Barra','Mancuernas','Polea','Cuerdas','Máquina','Peso corporal','Otro'];
+
 
 async function renderGymHome(body){
   if(!state.gymExercises){ state.gymExercises = await dbLoadGymExercises(state.userEmail); }
@@ -1549,8 +1692,8 @@ async function renderGymHome(body){
     <p style="font-size:11.5px; color:var(--running-blue-dark); margin:0 0 4px; font-weight:700;">Running — tocá un día para anotar tu salida</p>
     <div id="runStrip" style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:16px;"></div>
     <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 12px;">Elegí el día para ver tu rutina.</p>
-    ${state.gymExercises.length===0 ? `<button class="btn btn-secondary" id="loadSampleBtn" style="margin-top:0;">${ICONS.dumbbell} Cargar rutina de definición (5 días)</button>` : ''}
-    <div id="dayTabs" style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px;"></div>
+    <button class="btn btn-secondary" id="pickRoutineBtn" style="margin-top:0;">${ICONS.dumbbell} Elegí rutina precargada</button>
+    <div id="dayTabs" style="display:flex; flex-direction:column; gap:6px; margin-bottom:14px; margin-top:14px;"></div>
     <div class="eyebrow" style="margin-bottom:6px;">🏃 Running</div>
     <div id="runningHistory" style="margin-bottom:16px;"></div>
     <button class="btn btn-secondary" id="gymBack">Volver</button>
@@ -1606,23 +1749,7 @@ async function renderGymHome(body){
       </div>`).join('');
   }
 
-  const sampleBtn = body.querySelector('#loadSampleBtn');
-  if(sampleBtn){
-    sampleBtn.onclick = async ()=>{
-      if(!confirm('Esto va a cargar los 5 días (Lunes a Viernes) con todos sus ejercicios. ¿Seguimos?')) return;
-      sampleBtn.disabled = true; sampleBtn.textContent = 'Cargando...';
-      for(const day of Object.keys(SAMPLE_ROUTINE)){
-        const def = SAMPLE_ROUTINE[day];
-        state.gymDayTitles[day] = { title: def.title, completedAt: null };
-        await dbSetGymDayTitle(state.userEmail, day, def.title);
-        for(const ex of def.exercises){
-          const created = await dbCreateGymExercise(state.userEmail, day, ex.name, ex.equipment, '', ex.reps);
-          state.gymExercises.push(created);
-        }
-      }
-      renderGymHome(document.getElementById('screenBody'));
-    };
-  }
+  body.querySelector('#pickRoutineBtn').onclick = ()=>{ state.screen='gymRoutinePicker'; render(); };
   const tabs = body.querySelector('#dayTabs');
   GYM_DAYS.forEach(d=>{
     const title = state.gymDayTitles[d]?.title;
@@ -1634,6 +1761,99 @@ async function renderGymHome(body){
     tabs.appendChild(b);
   });
   body.querySelector('#gymBack').onclick = ()=>{ state.screen='userHome'; render(); };
+}
+
+function renderGymRoutinePicker(body){
+  body.innerHTML = `
+    <h2 style="margin-bottom:4px;">Elegí rutina precargada</h2>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 14px;">Se suma a lo que ya tengas cargado — no borra nada.</p>
+    <div id="routineList"></div>
+    <button class="btn btn-primary" id="goCustomBtn" style="margin-top:6px;">${ICONS.gear} Crear mi propia rutina</button>
+    <button class="btn btn-secondary" id="pickerBack">Volver</button>
+  `;
+  const list = body.querySelector('#routineList');
+  Object.keys(PRELOADED_ROUTINES).forEach(name=>{
+    const def = PRELOADED_ROUTINES[name];
+    const card = document.createElement('div');
+    card.className = 'card pro-card';
+    card.style.marginBottom = '10px';
+    const dayCount = Object.keys(def.days).length;
+    card.innerHTML = `
+      <div style="font-weight:800; font-size:15px;">${name}</div>
+      <p style="font-size:12px; color:var(--ink-soft); margin:4px 0 10px;">${def.desc} (${dayCount} días)</p>
+      <button class="btn btn-primary" style="margin-top:0;">Cargar "${name}"</button>
+    `;
+    card.querySelector('button').onclick = async ()=>{
+      if(!confirm(`Esto va a cargar los ${dayCount} días de "${name}" con todos sus ejercicios. ¿Seguimos?`)) return;
+      const btn = card.querySelector('button');
+      btn.disabled = true; btn.textContent = 'Cargando...';
+      for(const day of Object.keys(def.days)){
+        const dayDef = def.days[day];
+        state.gymDayTitles[day] = { title: dayDef.title, completedAt: (state.gymDayTitles[day]||{}).completedAt || null };
+        await dbSetGymDayTitle(state.userEmail, day, dayDef.title);
+        for(const ex of dayDef.exercises){
+          const created = await dbCreateGymExercise(state.userEmail, day, ex.name, ex.equipment, '', ex.reps);
+          state.gymExercises.push(created);
+        }
+      }
+      state.screen = 'gymHome';
+      render();
+    };
+    list.appendChild(card);
+  });
+  body.querySelector('#goCustomBtn').onclick = ()=>{ state.screen='gymCustomBuilder'; render(); };
+  body.querySelector('#pickerBack').onclick = ()=>{ state.screen='gymHome'; render(); };
+}
+
+function renderGymCustomBuilder(body){
+  body.innerHTML = `
+    <h2 style="margin-bottom:4px;">Crear mi propia rutina</h2>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 14px;">Elegí ejercicios de las rutinas precargadas y asignale un día a cada uno.</p>
+    <div id="builderList"></div>
+    <button class="btn btn-primary" id="saveCustomBtn">Guardar los que elegí</button>
+    <button class="btn btn-secondary" id="builderBack">Volver</button>
+  `;
+  const list = body.querySelector('#builderList');
+  const picks = []; // {name, equipment, reps, dayEl}
+  Object.keys(PRELOADED_ROUTINES).forEach(routineName=>{
+    const def = PRELOADED_ROUTINES[routineName];
+    const section = document.createElement('div');
+    section.innerHTML = `<div class="group-label" style="margin-top:10px;">${routineName}</div>`;
+    Object.keys(def.days).forEach(day=>{
+      def.days[day].exercises.forEach(ex=>{
+        const row = document.createElement('div');
+        row.className = 'ex-item';
+        row.style.padding = '8px 12px';
+        row.innerHTML = `
+          <input type="checkbox" class="pickCb" style="width:auto; margin-top:2px;">
+          <div class="ex-body">
+            <div class="name" style="font-size:13px;">${ex.name} ${ex.equipment ? `<span class="pill">${ex.equipment}</span>` : ''}</div>
+            <div class="answers">${ex.reps}</div>
+          </div>
+          <select class="pickDay" style="width:auto; padding:6px 8px; font-size:12px;">${GYM_DAYS.map(d=>`<option value="${d}" ${d===day?'selected':''}>${d.slice(0,3)}</option>`).join('')}</select>
+        `;
+        const cb = row.querySelector('.pickCb');
+        const daySel = row.querySelector('.pickDay');
+        picks.push({ex, cbEl:cb, daySelEl:daySel});
+        section.appendChild(row);
+      });
+    });
+    list.appendChild(section);
+  });
+  body.querySelector('#saveCustomBtn').onclick = async ()=>{
+    const chosen = picks.filter(p=>p.cbEl.checked);
+    if(chosen.length===0){ alert('Marcá al menos un ejercicio.'); return; }
+    const btn = body.querySelector('#saveCustomBtn');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    for(const p of chosen){
+      const day = p.daySelEl.value;
+      const created = await dbCreateGymExercise(state.userEmail, day, p.ex.name, p.ex.equipment, '', p.ex.reps);
+      state.gymExercises.push(created);
+    }
+    state.screen = 'gymHome';
+    render();
+  };
+  body.querySelector('#builderBack').onclick = ()=>{ state.screen='gymRoutinePicker'; render(); };
 }
 
 async function renderGymDay(body){
@@ -1961,7 +2181,7 @@ function renderUserHome(body){
       <div class="txt"><strong>Rutina gym</strong><span>Tu rutina semanal, ejercicios y evolución de kilos.</span></div>
       <div class="chev">${ICONS.chevron}</div>
     </div>
-    <p style="text-align:right; font-size:13px; font-weight:800; font-family:'Baloo 2', sans-serif; color:var(--terracotta-dark); margin-top:18px; letter-spacing:.01em;">Creada por Lucas Hernández 🇺🇾</p>
+    <p style="text-align:right; font-size:13px; font-weight:800; font-family:'Baloo 2', sans-serif; color:var(--terracotta-dark); margin-top:18px; letter-spacing:.01em;">Lucas Hernández 🇺🇾</p>
     <div class="bottom-nav">
       <button class="active">${ICONS.bolt}Entrenar</button>
       <button id="navEmail">${ICONS.gear}${state.userEmail.split('@')[0]}</button>
@@ -1989,6 +2209,7 @@ function renderUserHome(body){
 function renderSectionConfig(body){
   const isAccion = state.config.type==='accion';
   const isMemoria = state.config.type==='memoria';
+  const isVideo = state.config.type==='video';
   const title = isMemoria ? 'Llené memoria' : (isAccion?'Físico + Video + Acción':'Físico + Video');
   const desc = isMemoria
     ? 'Vas a memorizar dos números de camiseta antes de cada pasada. Definí el ejercicio físico que vas a hacer durante el conteo.'
@@ -1997,8 +2218,13 @@ function renderSectionConfig(body){
     <h2 style="margin-bottom:14px;">${title}</h2>
     <div class="card">
       <p style="font-size:13px; color:var(--ink-soft); margin:0 0 8px;">${desc}</p>
-      <label>Segundos por serie</label>
+      <label>Segundos por serie (ejercicio)</label>
       <input type="number" id="cSeconds" min="3" max="180" value="${state.config.seconds}">
+      ${isVideo ? `
+      <label>Segundos de recuperación (0 = Sin cronómetro (aviso al terminar))</label>
+      <input type="number" id="cRecovery" min="0" max="180" value="${state.config.recoverySeconds||0}">
+      <p style="font-size:11.5px; color:var(--ink-soft); margin:-4px 0 8px;">Ahí adentro entra el video y la decisión. Los últimos 5 segundos son el aviso final para decidir. Con 0 (sin cronómetro), no hay apuro — hay un aviso apenas termines de decidir, y ahí arranca la próxima serie.</p>
+      ` : ''}
       <label>Cantidad de series</label>
       <input type="number" id="cSeries" min="1" max="30" value="${state.config.series}">
       <div id="cfgErr" style="color:var(--brick); font-size:13px; font-weight:700; margin-top:10px; display:none;"></div>
@@ -2010,6 +2236,8 @@ function renderSectionConfig(body){
   body.querySelector('#startBtn').onclick = ()=>{
     const sec = parseInt(body.querySelector('#cSeconds').value,10);
     const ser = parseInt(body.querySelector('#cSeries').value,10);
+    const recovInput = body.querySelector('#cRecovery');
+    const recov = recovInput ? parseInt(recovInput.value,10)||0 : 0;
     const err = body.querySelector('#cfgErr');
     if(!sec || sec<3 || !ser || ser<1){
       err.textContent = 'Ingresá segundos (mín. 3) y series (mín. 1) válidos.';
@@ -2018,6 +2246,7 @@ function renderSectionConfig(body){
     }
     state.config.seconds = sec;
     state.config.series = ser;
+    state.config.recoverySeconds = recov;
     startSession();
   };
 }
@@ -2076,6 +2305,7 @@ function releaseImmersive(){
 function exitSessionRequest(){
   showExitConfirm(()=>{
     clearInterval(countdownTimer); clearInterval(prepTimer);
+    stopRecoveryClock();
     const s = state.session;
     const pct = s.series>0 ? s.repResults.length/s.series : 0;
     releaseImmersive();
@@ -2141,6 +2371,7 @@ function startSession(){
     type: state.config.type,
     seconds: state.config.seconds,
     series: state.config.series,
+    recoverySeconds: state.config.recoverySeconds||0,
     currentIndex: 0,
     topScore: 0,
     bottomScore: 0,
@@ -2198,6 +2429,42 @@ function seriesDots(s){
   return `<div class="dots">${dots}</div>`;
 }
 
+let recoveryTimerHandle = null;
+function startRecoveryClock(totalSeconds){
+  stopRecoveryClock();
+  const s = state.session;
+  s.recoveryDeadline = Date.now() + totalSeconds*1000;
+  const el = document.getElementById('recoveryClock');
+  el.style.display = 'block';
+  const tick = ()=>{
+    const remaining = Math.max(0, Math.ceil((s.recoveryDeadline - Date.now())/1000));
+    el.textContent = `⏱ ${remaining}s para decidir`;
+    el.classList.toggle('urgent', remaining<=5);
+    if(remaining<=0){
+      stopRecoveryClock();
+      if(!state.session) return;
+      if(state.session.phase==='graded'){
+        // Ya había contestado antes de tiempo: el reloj igual corrió completo,
+        // recién ahora que se cumplió pasa a la próxima serie.
+        advanceSerieOrFinish();
+      } else if(state.session.phase==='video' || state.session.phase==='answer'){
+        // Se acabó el tiempo sin terminar de decidir: calificamos con lo que
+        // haya elegido (lo no elegido cuenta como error) y avanzamos.
+        gradeAndReveal();
+        advanceSerieOrFinish();
+      }
+    }
+  };
+  tick();
+  recoveryTimerHandle = setInterval(tick, 200);
+}
+function stopRecoveryClock(){
+  clearInterval(recoveryTimerHandle);
+  recoveryTimerHandle = null;
+  const el = document.getElementById('recoveryClock');
+  if(el){ el.style.display='none'; el.classList.remove('urgent'); }
+}
+
 let countdownTimer = null;
 function runPhysicalCountdown(){
   const s = state.session;
@@ -2231,6 +2498,9 @@ function runPhysicalCountdown(){
       } else {
         s.phase='video';
         s.selectedTop=null; s.selectedBottom=null;
+        if(s.type==='video' && s.recoverySeconds>0){
+          startRecoveryClock(s.recoverySeconds);
+        }
       }
       renderSessionScreen(document.getElementById('screenBody'));
       return;
@@ -2635,19 +2905,18 @@ function renderSessionScreen(body){
       const banner = body.querySelector('#pointsBanner');
       banner.innerHTML = `<div class="points-banner ${cls}">+${pts} punto${pts===1?'':'s'} en esta jugada</div>`;
       if(s.type==='video'){
-        setTimeout(()=>{
-          s.currentIndex++;
-          if(s.currentIndex>=s.series){ finishSession(); return; }
-          runPrepCountdown(runPhysicalCountdown);
-        }, 1800);
+        if(s.recoverySeconds>0){
+          // El avance a la próxima serie lo maneja el reloj de recuperación (tiene que
+          // cumplirse completo, respondas rápido o no), no un tiempo fijo acá.
+        } else {
+          setTimeout(()=> advanceSerieOrFinish(), 1800);
+        }
       } else {
         const cont = document.createElement('button');
         cont.className='btn btn-sage';
         cont.innerHTML = (s.currentIndex+1>=s.series) ? `${ICONS.trophySmall} Ver resumen` : `${ICONS.play} Iniciar próxima serie`;
         cont.onclick = ()=>{
-          s.currentIndex++;
-          if(s.currentIndex>=s.series){ finishSession(); return; }
-          requireLandscapeThen(()=> runPrepCountdown(runPhysicalCountdown));
+          requireLandscapeThen(()=> advanceSerieOrFinish());
         };
         body.appendChild(cont);
       }
@@ -2684,6 +2953,13 @@ function startResolvingWait(){
   },1000);
 }
 
+function advanceSerieOrFinish(){
+  const s = state.session;
+  s.currentIndex++;
+  if(s.currentIndex>=s.series){ finishSession(); return; }
+  runPrepCountdown(runPhysicalCountdown);
+}
+
 function gradeAndReveal(){
   const s = state.session;
   const ex = s.currentExercise;
@@ -2696,6 +2972,7 @@ function gradeAndReveal(){
 }
 
 async function finishSession(){
+  stopRecoveryClock();
   const s = state.session;
   const rec = { date:new Date().toISOString(), email:state.userEmail, type:s.type, series:s.series, topScore:s.topScore, bottomScore:s.bottomScore };
   state.history.push(rec);
