@@ -586,7 +586,7 @@ async function shareResultImage(opts, format){
   const motivBlockH = (motivLines.length-1)*motivLineH;
   const motivStartY = H - 40 - motivBlockH;
 
-  const captionGap = vertical ? 34 : 20;
+  const captionGap = vertical ? 70 : 42;
   ctx.fillStyle = 'rgba(255,255,255,0.65)';
   ctx.font = `700 ${vertical?22:13}px 'Nunito Sans'`;
   ctx.fillText('La frase de hoy', W/2, motivStartY - captionGap);
