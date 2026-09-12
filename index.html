@@ -467,8 +467,9 @@ async function shareResultImage(opts, format){
   const W = vertical ? 1080 : 900;
   const H = vertical ? 2160 : 500;
   const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
+  canvas.width = W*2; canvas.height = H*2;
   const ctx = canvas.getContext('2d');
+  ctx.scale(2,2);
 
   const bg = await loadImgForCanvas(BG_PHOTO_URI);
   if(bg){
@@ -489,11 +490,11 @@ async function shareResultImage(opts, format){
 
   ctx.textAlign = 'center';
 
-  // Logo pegado directo arriba a la izquierda, tal cual es, sin ninguna placa de fondo
   const logo = await loadImgForCanvas(APP_LOGO);
-  const logoSize = vertical ? 130 : 84;
-  if(logo){
-    ctx.drawImage(logo, vertical?36:28, vertical?36:24, logoSize, logoSize);
+
+  if(!vertical && logo){
+    // Horizontal: logo pegado arriba a la izquierda, tal cual, sin placa
+    ctx.drawImage(logo, 28, 24, 84, 84);
   }
 
   // Nombre de la app, centrado arriba
@@ -510,9 +511,19 @@ async function shareResultImage(opts, format){
   ctx.font = `800 ${vertical?42:26}px 'Nunito Sans'`;
   ctx.fillText(eyebrowText, W/2, subY);
 
+  let contentStartY = vertical ? Math.round(H*0.40) : 200;
+  if(vertical && logo){
+    // Vertical: el logo va centrado debajo del subtítulo, con lugar de por medio
+    const logoSize = 150;
+    const logoGap = 44;
+    const logoY = subY + logoGap;
+    ctx.drawImage(logo, W/2-logoSize/2, logoY, logoSize, logoSize);
+    contentStartY = Math.max(contentStartY, logoY + logoSize + 80);
+  }
+
   // A partir de acá, lo importante: título/puntaje y días, bien grandes, ocupando
   // casi toda la imagen. Todo lo demás queda chico en comparación.
-  let y = vertical ? Math.round(H*0.40) : 200;
+  let y = contentStartY;
 
   if(opts.scoreBig){
     ctx.fillStyle = '#8CF29A';
@@ -604,7 +615,7 @@ function attachShareFlow(btnEl, buildOpts){
       <input type="text" class="shareExtraInput" placeholder="Ej: 45 min corriendo, cómo te sentiste, etc.">
       <div style="display:flex; gap:8px; margin-top:10px;">
         <button class="btn btn-primary shareConfirmBtn" data-fmt="vertical" style="margin-top:0; flex:1;">📱 Vertical</button>
-        <button class="btn btn-primary shareConfirmBtn" data-fmt="horizontal" style="margin-top:0; flex:1;">🖼️ Horizontal</button>
+        <button class="btn btn-primary shareConfirmBtn" data-fmt="horizontal" style="margin-top:0; flex:1;"><span style="display:inline-block; transform:rotate(90deg);">📱</span> Horizontal</button>
       </div>
     `;
     btnEl.replaceWith(wrap);
