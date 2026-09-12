@@ -408,6 +408,22 @@ function loadImgForCanvas(src){
     img.src = src;
   });
 }
+function splitLinesForWidth(ctx, text, maxWidth){
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for(let i=0;i<words.length;i++){
+    const test = line + words[i] + ' ';
+    if(ctx.measureText(test).width > maxWidth && line !== ''){
+      lines.push(line.trim());
+      line = words[i] + ' ';
+    } else {
+      line = test;
+    }
+  }
+  lines.push(line.trim());
+  return lines;
+}
 function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight){
   const words = text.split(' ');
   let line = '', curY = y;
@@ -471,10 +487,14 @@ async function shareResultImage(opts, format){
   ctx.fillStyle = grad;
   ctx.fillRect(0,0,W,H);
 
-  ctx.fillStyle = '#D97C52';
-  ctx.fillRect(0, H-16, W, 16);
-
   ctx.textAlign = 'center';
+
+  // Logo pegado directo arriba a la izquierda, tal cual es, sin ninguna placa de fondo
+  const logo = await loadImgForCanvas(APP_LOGO);
+  const logoSize = vertical ? 130 : 84;
+  if(logo){
+    ctx.drawImage(logo, vertical?36:28, vertical?36:24, logoSize, logoSize);
+  }
 
   // Nombre de la app, centrado arriba
   const nameY = vertical ? 90 : 44;
@@ -545,11 +565,17 @@ async function shareResultImage(opts, format){
     ctx.fillText(opts.statLine, W/2, y);
   }
 
-  // Frase motivacional, centrada abajo del todo
+  // Frase motivacional, bien grande, centrada abajo del todo (en varios renglones si hace falta)
   const motiv = MOTIVATIONAL_MESSAGES[Math.floor(Math.random()*MOTIVATIONAL_MESSAGES.length)];
+  const motivSize = vertical ? 52 : 30;
+  const motivLineH = vertical ? 62 : 36;
+  ctx.font = `italic 700 ${motivSize}px 'Nunito Sans'`;
+  const motivMaxW = W - (vertical?140:90);
+  const motivLines = splitLinesForWidth(ctx, motiv, motivMaxW);
+  const motivBlockH = (motivLines.length-1)*motivLineH;
+  const motivStartY = H - 40 - motivBlockH;
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.font = `italic 700 ${vertical?28:16}px 'Nunito Sans'`;
-  ctx.fillText(motiv, W/2, H-40);
+  motivLines.forEach((ln,i)=> ctx.fillText(ln, W/2, motivStartY + i*motivLineH));
   ctx.textAlign = 'left';
 
   canvas.toBlob((blob)=>{
