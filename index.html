@@ -426,7 +426,7 @@ function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight){
 }
 async function shareResultImage(opts){
   try{ await document.fonts.ready; }catch(e){}
-  const W = 1200, H = 500;
+  const W = 900, H = 500;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -453,21 +453,29 @@ async function shareResultImage(opts){
 
   const logo = await loadImgForCanvas(APP_LOGO);
   if(logo){
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.fillRect(44,40,96,96);
-    ctx.drawImage(logo, 50,46,84,84);
+    // Recortamos solo el símbolo (sol + pelota + olas), sin el texto de abajo, y lo
+    // metemos en un círculo bien chico — nada de cuadrado blanco de fondo.
+    const cx = 40+46, cy = 40+46, r = 46;
+    const sx = logo.width*0.234, sy = logo.height*0.130, sw2 = logo.width*0.547, sh2 = logo.height*0.468;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI*2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(logo, sx, sy, sw2, sh2, cx-r, cy-r, r*2, r*2);
+    ctx.restore();
   }
 
   ctx.fillStyle = '#fff';
-  ctx.font = "800 27px 'Baloo 2'";
-  ctx.fillText('ENTRENA REF BEACH SOCCER', 158, 74);
-  ctx.font = "600 18px 'Nunito Sans'";
+  ctx.font = "800 25px 'Baloo 2'";
+  ctx.fillText('ENTRENA REF BEACH SOCCER', 146, 74);
+  ctx.font = "600 17px 'Nunito Sans'";
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.fillText(opts.eyebrow || 'Resultado del entrenamiento', 158, 102);
+  ctx.fillText(opts.eyebrow || 'Resultado del entrenamiento', 146, 100);
 
   ctx.fillStyle = '#FFD98A';
-  ctx.font = "800 60px 'Baloo 2'";
-  wrapCanvasText(ctx, opts.headline, 44, 230, W-88, 64);
+  ctx.font = "800 54px 'Baloo 2'";
+  wrapCanvasText(ctx, opts.headline, 44, 220, W-88, 58);
 
   if(opts.subtext){
     ctx.fillStyle = '#fff';
@@ -489,6 +497,28 @@ async function shareResultImage(opts){
 }
 function shareBtnHtml(){
   return `<button class="btn btn-secondary shareResultBtn" style="margin-top:8px;">📤 Compartir resultado</button>`;
+}
+function attachShareFlow(btnEl, buildOpts){
+  if(!btnEl) return;
+  btnEl.onclick = ()=>{
+    const wrap = document.createElement('div');
+    wrap.className = 'card pro-card';
+    wrap.style.marginTop = '8px';
+    wrap.innerHTML = `
+      <label style="font-size:11.5px;">Sumale algo más a la imagen (opcional)</label>
+      <input type="text" class="shareExtraInput" placeholder="Ej: 45 min corriendo, cómo te sentiste, etc.">
+      <button class="btn btn-primary shareConfirmBtn" style="margin-top:10px;">${ICONS.chevron} Generar y descargar imagen</button>
+    `;
+    btnEl.replaceWith(wrap);
+    const input = wrap.querySelector('.shareExtraInput');
+    input.focus();
+    wrap.querySelector('.shareConfirmBtn').onclick = ()=>{
+      const extra = input.value.trim();
+      const opts = buildOpts();
+      if(extra) opts.subtext = (opts.subtext ? opts.subtext + ' · ' : '') + extra;
+      shareResultImage(opts);
+    };
+  };
 }
 
 const ICONS = {
@@ -1801,19 +1831,21 @@ async function renderGymHome(body){
     weekStrip.appendChild(b);
   });
   const configuredDays = GYM_DAYS.filter(d=> state.gymExercises.some(e=>e.day===d));
-  const weekAllDone = configuredDays.length>0 && configuredDays.every(d=> isDoneThisWeek(state.gymDayTitles[d]));
+  const doneDays = GYM_DAYS.filter(d=> isDoneThisWeek(state.gymDayTitles[d]));
+  const weekAllDone = configuredDays.length>0 && configuredDays.every(d=> doneDays.includes(d));
   if(weekAllDone){
+    const totalDays = Math.max(configuredDays.length, doneDays.length);
     const wrap = body.querySelector('#weekShareWrap');
     wrap.innerHTML = `<div class="card" style="text-align:center; background:linear-gradient(150deg,var(--done-green),var(--done-green-dark)); color:#fff; padding:10px;">
       <div style="font-weight:800; margin-bottom:6px;">🎉 ¡Semana completa!</div>
       ${shareBtnHtml()}
     </div>`;
     wrap.querySelector('.shareResultBtn').style.cssText += 'background:#fff; color:var(--done-green-dark);';
-    wrap.querySelector('.shareResultBtn').onclick = ()=> shareResultImage({
+    attachShareFlow(wrap.querySelector('.shareResultBtn'), ()=>({
       eyebrow: 'Rutina gym',
-      headline: '¡Semana completa!',
-      subtext: `${configuredDays.length} días de rutina cumplidos`
-    });
+      headline: `${doneDays.length}/${totalDays} días`,
+      subtext: doneDays.join(', ')
+    }));
   }
 
   function dateForWeekday(idx){ // idx 0=Lunes..6=Domingo
@@ -1981,11 +2013,11 @@ async function renderGymDay(body){
   `;
   const shareBtn = body.querySelector('.shareResultBtn');
   if(shareBtn){
-    shareBtn.onclick = ()=> shareResultImage({
+    attachShareFlow(shareBtn, ()=>({
       eyebrow: 'Rutina gym',
       headline: `¡${state.gymDay} completo!`,
       subtext: dayInfo.title || ''
-    });
+    }));
   }
   body.querySelector('#markDoneBtn').onclick = async ()=>{
     const now = await dbMarkDayCompleted(state.userEmail, state.gymDay);
@@ -3425,11 +3457,11 @@ function renderVideoTestSummary(body){
     <button class="btn btn-primary" id="vtAgainBtn">${ICONS.repeat} Hacer otro Video Test</button>
     <button class="btn btn-secondary" id="vtHomeBtn">Volver al inicio</button>
   `;
-  body.querySelector('.shareResultBtn').onclick = ()=> shareResultImage({
+  attachShareFlow(body.querySelector('.shareResultBtn'), ()=>({
     eyebrow: 'Video Test',
     headline: `${pct}% de acierto`,
     subtext: `${vt.score}/${vt.maxScore} puntos · ${vt.results.length} jugadas`
-  });
+  }));
   const list = body.querySelector('#wrongList');
   wrong.forEach((r,i)=>{
     const div = document.createElement('div');
@@ -3776,11 +3808,11 @@ function renderPruebaRun(body){
         <button class="btn btn-secondary" id="prHome" style="flex:1; margin-top:0; padding:10px;">Inicio</button>
       </div>
     `;
-    body.querySelector('.shareResultBtn').onclick = ()=> shareResultImage({
+    attachShareFlow(body.querySelector('.shareResultBtn'), ()=>({
       eyebrow: kindName,
       headline: shareHeadline,
       subtext: pr.kind==='yoyo' && pr.historyRecord && pr.historyRecord.officialLevel ? `Nivel oficial: ${pr.historyRecord.officialLevel}` : ''
-    });
+    }));
     const starRow = body.querySelector('#starRow');
     if(starRow){
       STAR_LABELS.forEach((label,i)=>{
@@ -3940,11 +3972,11 @@ function renderSummary(body){
     <button class="btn btn-primary" id="againBtn">${ICONS.repeat} Entrenar de nuevo</button>
     <button class="btn btn-secondary" id="homeBtn">Volver al inicio</button>
   `;
-  body.querySelector('.shareResultBtn').onclick = ()=> shareResultImage({
+  attachShareFlow(body.querySelector('.shareResultBtn'), ()=>({
     eyebrow: s.type==='accion' ? 'Físico + Video + Acción' : 'Físico + Video',
     headline: `${pct}% de acierto`,
     subtext: `${total}/${max} puntos · ${s.series} series completadas`
-  });
+  }));
   body.querySelector('#againBtn').onclick = ()=>{ state.screen='sectionConfig'; render(); };
   body.querySelector('#homeBtn').onclick = ()=>{ state.session=null; state.screen='userHome'; render(); };
 }
