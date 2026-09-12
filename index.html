@@ -494,7 +494,7 @@ async function shareResultImage(opts, format){
 
   if(!vertical && logo){
     // Horizontal: logo pegado arriba a la izquierda, tal cual, sin placa
-    ctx.drawImage(logo, 28, 24, 168, 168);
+    ctx.drawImage(logo, W-168-16, 16, 168, 168);
   }
 
   // Nombre de la app, centrado arriba
@@ -585,6 +585,13 @@ async function shareResultImage(opts, format){
   const motivLines = splitLinesForWidth(ctx, motiv, motivMaxW);
   const motivBlockH = (motivLines.length-1)*motivLineH;
   const motivStartY = H - 40 - motivBlockH;
+
+  const captionGap = vertical ? 34 : 20;
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.font = `700 ${vertical?22:13}px 'Nunito Sans'`;
+  ctx.fillText('La frase de hoy', W/2, motivStartY - captionGap);
+
+  ctx.font = `italic 700 ${motivSize}px 'Nunito Sans'`;
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   motivLines.forEach((ln,i)=> ctx.fillText(ln, W/2, motivStartY + i*motivLineH));
   ctx.textAlign = 'left';
