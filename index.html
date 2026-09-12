@@ -474,138 +474,110 @@ async function shareResultImage(opts, format){
   ctx.fillStyle = '#D97C52';
   ctx.fillRect(0, H-16, W, 16);
 
-  // Logo recortado bien ajustado a su contenido (símbolo + letras), para que quede
-  // el mínimo de blanco posible dentro de la placa.
-  const logo = await loadImgForCanvas(APP_LOGO);
-  const logoSize = vertical ? 190 : 120;
-  const logoX = vertical ? (W-logoSize)/2 : 44;
-  const logoY = vertical ? 70 : 44;
-  if(logo){
-    ctx.fillStyle = 'rgba(255,255,255,0.96)';
-    roundRectPath(ctx, logoX, logoY, logoSize, logoSize, 20);
-    ctx.fill();
-    const lsx = logo.width*0.234, lsy = logo.height*0.130, lsw = logo.width*0.546, lsh = logo.height*0.650;
-    const pad = 6;
-    const inner = logoSize - pad*2;
-    const cropRatio = lsw/lsh;
-    let dw = inner, dh = inner/cropRatio;
-    if(dh > inner){ dh = inner; dw = inner*cropRatio; }
-    ctx.drawImage(logo, lsx, lsy, lsw, lsh, logoX+(logoSize-dw)/2, logoY+(logoSize-dh)/2, dw, dh);
-  }
+  ctx.textAlign = 'center';
 
-  ctx.textAlign = vertical ? 'center' : 'left';
-  const nameX = vertical ? W/2 : logoX+logoSize+18;
-  const nameY = vertical ? logoY+logoSize+56 : logoY+40;
+  // Nombre de la app, centrado arriba
+  const nameY = vertical ? 90 : 56;
   ctx.fillStyle = '#fff';
   ctx.font = `800 ${vertical?36:24}px 'Baloo 2'`;
-  ctx.fillText('ENTRENA REF BEACH SOCCER', nameX, nameY);
-  ctx.textAlign = 'left';
+  ctx.fillText('ENTRENA REF BEACH SOCCER', W/2, nameY);
 
-  // Ícono del tipo de entrenamiento + etiqueta, más grande y notorio
+  // Subtítulo: ícono del tipo de entrenamiento + de qué se trata, centrado justo debajo
   const TYPE_ICONS = { gym:ICON_GYM, memoria:ICON_MEMORIA, fisicovideo:ICON_FISICOVIDEO, accion:ICON_ACCION, videotest:ICON_VIDEOTEST, pruebas:ICON_PRUEBAS };
-  let y = vertical ? nameY + 70 : nameY + 34;
-  const badgeSize = vertical ? 56 : 36;
   const eyebrowText = opts.eyebrow || 'Resultado del entrenamiento';
+  const subY = nameY + (vertical?58:34);
+  const iconSize = vertical ? 40 : 26;
+  ctx.font = `800 ${vertical?26:18}px 'Nunito Sans'`;
   if(opts.iconKey && TYPE_ICONS[opts.iconKey]){
     const icon = await loadImgForCanvas(TYPE_ICONS[opts.iconKey]);
+    const textW = ctx.measureText(eyebrowText).width;
+    const groupW = icon ? iconSize + 10 + textW : textW;
+    const startX = (W-groupW)/2;
     if(icon){
-      const bx = vertical ? W/2 - (ctx.measureText(eyebrowText).width + badgeSize + 14)/2 : 44;
-      ctx.font = `800 ${vertical?30:22}px 'Nunito Sans'`;
-      const textW = ctx.measureText(eyebrowText).width;
-      const groupW = badgeSize + 12 + textW;
-      const startX = vertical ? (W-groupW)/2 : 44;
-      ctx.fillStyle = 'rgba(255,255,255,0.96)';
-      roundRectPath(ctx, startX, y-badgeSize+8, badgeSize, badgeSize, 12);
-      ctx.fill();
-      ctx.drawImage(icon, startX+5, y-badgeSize+13, badgeSize-10, badgeSize-10);
-      ctx.fillStyle = '#FFD98A';
-      ctx.textAlign = 'left';
-      ctx.fillText(eyebrowText, startX+badgeSize+12, y);
+      ctx.drawImage(icon, startX, subY-iconSize+6, iconSize, iconSize);
     }
+    ctx.fillStyle = '#FFD98A';
+    ctx.textAlign = 'left';
+    ctx.fillText(eyebrowText, startX + (icon?iconSize+10:0), subY);
+    ctx.textAlign = 'center';
   } else {
     ctx.fillStyle = '#FFD98A';
-    ctx.font = `800 ${vertical?30:22}px 'Nunito Sans'`;
-    ctx.textAlign = vertical ? 'center' : 'left';
-    ctx.fillText(eyebrowText, vertical?W/2:44, y);
+    ctx.fillText(eyebrowText, W/2, subY);
   }
-  ctx.textAlign = 'left';
-  y += vertical ? 110 : 60;
+
+  // Título / puntaje principal, centrado a mitad de la imagen
+  let y = Math.round(H*0.44);
 
   if(opts.scoreBig){
-    ctx.textAlign = vertical ? 'center' : 'left';
-    const sx = vertical ? W/2 : 44;
     ctx.fillStyle = '#8CF29A';
     ctx.font = `800 ${vertical?170:90}px 'Baloo 2'`;
-    ctx.fillText(opts.scoreBig, sx, y);
+    ctx.fillText(opts.scoreBig, W/2, y);
     if(opts.scoreSmall){
       ctx.fillStyle = 'rgba(255,255,255,0.75)';
       ctx.font = `700 ${vertical?40:24}px 'Nunito Sans'`;
-      ctx.fillText(opts.scoreSmall, sx, y + (vertical?66:36));
-      y += (vertical?170:70);
+      ctx.fillText(opts.scoreSmall, W/2, y + (vertical?66:36));
+      y += (vertical?120:66);
     } else {
-      y += (vertical?100:40);
+      y += (vertical?60:34);
     }
-    ctx.textAlign = 'left';
   } else if(opts.headline){
     ctx.fillStyle = '#FFD98A';
     ctx.font = `800 ${vertical?92:50}px 'Baloo 2'`;
-    ctx.textAlign = vertical ? 'center' : 'left';
-    y = wrapCanvasText(ctx, opts.headline, vertical?W/2:44, y, W - (vertical?140:88), vertical?98:56);
-    ctx.textAlign = 'left';
-    y += vertical?130:50;
+    y = wrapCanvasText(ctx, opts.headline, W/2, y, W - (vertical?140:88), vertical?98:56);
+    y += vertical?70:40;
   }
 
+  // Días (si corresponde), un poco más abajo del título
+  y += vertical?40:16;
   if(opts.daysChecklist && opts.daysChecklist.length){
     const chipW = vertical ? 150 : 84;
     const chipH = vertical ? 76 : 40;
     const gap = vertical ? 16 : 12;
     const totalW = opts.daysChecklist.length*chipW + (opts.daysChecklist.length-1)*gap;
-    let cx = vertical ? (W-totalW)/2 : 44;
+    let cx = (W-totalW)/2;
+    ctx.textAlign = 'center';
     for(const d of opts.daysChecklist){
       ctx.fillStyle = 'rgba(255,255,255,0.16)';
       roundRectPath(ctx, cx, y, chipW, chipH, 14);
       ctx.fill();
       ctx.fillStyle = '#8CF29A';
       ctx.font = `800 ${vertical?28:16}px 'Nunito Sans'`;
-      ctx.textAlign = 'center';
       ctx.fillText(`✔ ${d}`, cx+chipW/2, y+chipH/2+9);
-      ctx.textAlign = 'left';
       cx += chipW+gap;
     }
-    y += chipH + (vertical?70:26);
+    y += chipH + (vertical?36:20);
   }
 
   if(opts.daysText){
     ctx.fillStyle = '#fff';
     ctx.font = `700 ${vertical?36:24}px 'Nunito Sans'`;
-    ctx.textAlign = vertical ? 'center' : 'left';
-    ctx.fillText(opts.daysText, vertical?W/2:44, y);
-    ctx.textAlign = 'left';
-    y += vertical?90:36;
+    ctx.textAlign = 'center';
+    ctx.fillText(opts.daysText, W/2, y);
+    y += vertical?60:32;
   }
 
+  // Cualquier otra info extra, entre los días y el espacio libre de abajo
   if(opts.subtext){
     ctx.fillStyle = 'rgba(255,255,255,0.92)';
     ctx.font = `600 ${vertical?32:20}px 'Nunito Sans'`;
-    ctx.textAlign = vertical ? 'center' : 'left';
-    y = wrapCanvasText(ctx, opts.subtext, vertical?W/2:44, y, W-(vertical?140:88), vertical?42:26);
-    ctx.textAlign = 'left';
-    y += vertical?60:24;
+    ctx.textAlign = 'center';
+    y = wrapCanvasText(ctx, opts.subtext, W/2, y, W-(vertical?140:88), vertical?42:26);
+    y += vertical?40:20;
   }
 
   if(opts.statLine){
     ctx.fillStyle = '#FFD98A';
     ctx.font = `700 ${vertical?30:18}px 'Nunito Sans'`;
-    ctx.textAlign = vertical ? 'center' : 'left';
-    ctx.fillText(opts.statLine, vertical?W/2:44, vertical?H-160:H-90);
-    ctx.textAlign = 'left';
+    ctx.textAlign = 'center';
+    ctx.fillText(opts.statLine, W/2, y);
   }
 
+  // Frase motivacional, abajo a la derecha
   const motiv = MOTIVATIONAL_MESSAGES[Math.floor(Math.random()*MOTIVATIONAL_MESSAGES.length)];
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.font = `italic 700 ${vertical?30:18}px 'Nunito Sans'`;
-  ctx.textAlign = vertical ? 'center' : 'left';
-  ctx.fillText(motiv, vertical?W/2:44, H-56);
+  ctx.font = `italic 700 ${vertical?28:16}px 'Nunito Sans'`;
+  ctx.textAlign = 'right';
+  ctx.fillText(motiv, W-36, H-56);
   ctx.textAlign = 'left';
 
   canvas.toBlob((blob)=>{
