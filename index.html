@@ -477,90 +477,64 @@ async function shareResultImage(opts, format){
   ctx.textAlign = 'center';
 
   // Nombre de la app, centrado arriba
-  const nameY = vertical ? 90 : 56;
+  const nameY = vertical ? 90 : 44;
+  const nameSize = vertical ? 36 : 22;
   ctx.fillStyle = '#fff';
-  ctx.font = `800 ${vertical?36:24}px 'Baloo 2'`;
+  ctx.font = `800 ${nameSize}px 'Baloo 2'`;
   ctx.fillText('ENTRENA REF BEACH SOCCER', W/2, nameY);
 
-  // Subtítulo: ícono del tipo de entrenamiento + de qué se trata, centrado justo debajo
-  const TYPE_ICONS = { gym:ICON_GYM, memoria:ICON_MEMORIA, fisicovideo:ICON_FISICOVIDEO, accion:ICON_ACCION, videotest:ICON_VIDEOTEST, pruebas:ICON_PRUEBAS };
+  // Subtítulo: de qué se trata (sin ícono), un poco más grande que el nombre de la app
   const eyebrowText = opts.eyebrow || 'Resultado del entrenamiento';
-  const subY = nameY + (vertical?58:34);
-  const iconSize = vertical ? 40 : 26;
-  ctx.font = `800 ${vertical?26:18}px 'Nunito Sans'`;
-  if(opts.iconKey && TYPE_ICONS[opts.iconKey]){
-    const icon = await loadImgForCanvas(TYPE_ICONS[opts.iconKey]);
-    const textW = ctx.measureText(eyebrowText).width;
-    const groupW = icon ? iconSize + 10 + textW : textW;
-    const startX = (W-groupW)/2;
-    if(icon){
-      ctx.drawImage(icon, startX, subY-iconSize+6, iconSize, iconSize);
-    }
-    ctx.fillStyle = '#FFD98A';
-    ctx.textAlign = 'left';
-    ctx.fillText(eyebrowText, startX + (icon?iconSize+10:0), subY);
-    ctx.textAlign = 'center';
-  } else {
-    ctx.fillStyle = '#FFD98A';
-    ctx.fillText(eyebrowText, W/2, subY);
-  }
+  const subY = nameY + (vertical?54:32);
+  ctx.fillStyle = '#FFD98A';
+  ctx.font = `800 ${vertical?42:26}px 'Nunito Sans'`;
+  ctx.fillText(eyebrowText, W/2, subY);
 
-  // Título / puntaje principal, centrado a mitad de la imagen
-  let y = Math.round(H*0.44);
+  // A partir de acá, lo importante: título/puntaje y días, bien grandes, ocupando
+  // casi toda la imagen. Todo lo demás queda chico en comparación.
+  let y = vertical ? Math.round(H*0.40) : 200;
 
   if(opts.scoreBig){
     ctx.fillStyle = '#8CF29A';
-    ctx.font = `800 ${vertical?170:90}px 'Baloo 2'`;
+    ctx.font = `800 ${vertical?190:118}px 'Baloo 2'`;
     ctx.fillText(opts.scoreBig, W/2, y);
     if(opts.scoreSmall){
       ctx.fillStyle = 'rgba(255,255,255,0.75)';
-      ctx.font = `700 ${vertical?40:24}px 'Nunito Sans'`;
-      ctx.fillText(opts.scoreSmall, W/2, y + (vertical?66:36));
-      y += (vertical?120:66);
+      ctx.font = `700 ${vertical?42:26}px 'Nunito Sans'`;
+      ctx.fillText(opts.scoreSmall, W/2, y + (vertical?66:38));
+      y += (vertical?120:76);
     } else {
-      y += (vertical?60:34);
+      y += (vertical?60:40);
     }
   } else if(opts.headline){
     ctx.fillStyle = '#FFD98A';
-    ctx.font = `800 ${vertical?92:50}px 'Baloo 2'`;
-    y = wrapCanvasText(ctx, opts.headline, W/2, y, W - (vertical?140:88), vertical?98:56);
-    y += vertical?70:40;
+    ctx.font = `800 ${vertical?100:66}px 'Baloo 2'`;
+    y = wrapCanvasText(ctx, opts.headline, W/2, y, W - (vertical?110:64), vertical?104:70);
+    y += vertical?70:46;
   }
 
-  // Días (si corresponde), un poco más abajo del título
-  y += vertical?40:16;
   if(opts.daysChecklist && opts.daysChecklist.length){
-    const chipW = vertical ? 150 : 84;
-    const chipH = vertical ? 76 : 40;
-    const gap = vertical ? 16 : 12;
+    const chipW = vertical ? 168 : 108;
+    const chipH = vertical ? 86 : 54;
+    const gap = vertical ? 18 : 14;
     const totalW = opts.daysChecklist.length*chipW + (opts.daysChecklist.length-1)*gap;
     let cx = (W-totalW)/2;
-    ctx.textAlign = 'center';
     for(const d of opts.daysChecklist){
       ctx.fillStyle = 'rgba(255,255,255,0.16)';
-      roundRectPath(ctx, cx, y, chipW, chipH, 14);
+      roundRectPath(ctx, cx, y, chipW, chipH, 16);
       ctx.fill();
       ctx.fillStyle = '#8CF29A';
-      ctx.font = `800 ${vertical?28:16}px 'Nunito Sans'`;
-      ctx.fillText(`✔ ${d}`, cx+chipW/2, y+chipH/2+9);
+      ctx.font = `800 ${vertical?32:19}px 'Nunito Sans'`;
+      ctx.fillText(`✔ ${d}`, cx+chipW/2, y+chipH/2+10);
       cx += chipW+gap;
     }
-    y += chipH + (vertical?36:20);
+    y += chipH + (vertical?50:28);
   }
 
-  if(opts.daysText){
-    ctx.fillStyle = '#fff';
-    ctx.font = `700 ${vertical?36:24}px 'Nunito Sans'`;
-    ctx.textAlign = 'center';
-    ctx.fillText(opts.daysText, W/2, y);
-    y += vertical?60:32;
-  }
-
-  // Cualquier otra info extra, entre los días y el espacio libre de abajo
+  // Cualquier otra info extra, más chica que lo anterior
   if(opts.subtext){
     ctx.fillStyle = 'rgba(255,255,255,0.92)';
     ctx.font = `600 ${vertical?32:20}px 'Nunito Sans'`;
-    ctx.textAlign = 'center';
     y = wrapCanvasText(ctx, opts.subtext, W/2, y, W-(vertical?140:88), vertical?42:26);
     y += vertical?40:20;
   }
@@ -568,16 +542,14 @@ async function shareResultImage(opts, format){
   if(opts.statLine){
     ctx.fillStyle = '#FFD98A';
     ctx.font = `700 ${vertical?30:18}px 'Nunito Sans'`;
-    ctx.textAlign = 'center';
     ctx.fillText(opts.statLine, W/2, y);
   }
 
-  // Frase motivacional, abajo a la derecha
+  // Frase motivacional, centrada abajo del todo
   const motiv = MOTIVATIONAL_MESSAGES[Math.floor(Math.random()*MOTIVATIONAL_MESSAGES.length)];
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
   ctx.font = `italic 700 ${vertical?28:16}px 'Nunito Sans'`;
-  ctx.textAlign = 'right';
-  ctx.fillText(motiv, W-36, H-56);
+  ctx.fillText(motiv, W/2, H-40);
   ctx.textAlign = 'left';
 
   canvas.toBlob((blob)=>{
@@ -1964,7 +1936,6 @@ async function renderGymHome(body){
       iconKey: 'gym',
       headline: '¡Semana completa!',
       daysChecklist: doneDays.map(d=>d.slice(0,3)),
-      daysText: `${doneDays.length} días de ${totalDays} días`,
       statLine: state.gymTotalCompletions ? `🔥 ${state.gymTotalCompletions} rutinas completadas en total` : ''
     }));
   }
