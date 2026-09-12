@@ -494,7 +494,7 @@ async function shareResultImage(opts, format){
 
   if(!vertical && logo){
     // Horizontal: logo pegado arriba a la izquierda, tal cual, sin placa
-    ctx.drawImage(logo, 28, 24, 84, 84);
+    ctx.drawImage(logo, 28, 24, 168, 168);
   }
 
   // Nombre de la app, centrado arriba
@@ -514,7 +514,7 @@ async function shareResultImage(opts, format){
   let contentStartY = vertical ? Math.round(H*0.40) : 200;
   if(vertical && logo){
     // Vertical: el logo va centrado debajo del subtítulo, con lugar de por medio
-    const logoSize = 150;
+    const logoSize = 300;
     const logoGap = 44;
     const logoY = subY + logoGap;
     ctx.drawImage(logo, W/2-logoSize/2, logoY, logoSize, logoSize);
