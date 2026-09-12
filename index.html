@@ -474,103 +474,136 @@ async function shareResultImage(opts, format){
   ctx.fillStyle = '#D97C52';
   ctx.fillRect(0, H-16, W, 16);
 
-  // Logo completo, con sus letras, en una placa blanca redondeada (no recortado)
+  // Logo recortado bien ajustado a su contenido (símbolo + letras), para que quede
+  // el mínimo de blanco posible dentro de la placa.
   const logo = await loadImgForCanvas(APP_LOGO);
-  const logoSize = vertical ? 180 : 120;
+  const logoSize = vertical ? 190 : 120;
   const logoX = vertical ? (W-logoSize)/2 : 44;
-  const logoY = 44;
+  const logoY = vertical ? 70 : 44;
   if(logo){
     ctx.fillStyle = 'rgba(255,255,255,0.96)';
     roundRectPath(ctx, logoX, logoY, logoSize, logoSize, 20);
     ctx.fill();
-    ctx.drawImage(logo, logoX+8, logoY+8, logoSize-16, logoSize-16);
+    const lsx = logo.width*0.234, lsy = logo.height*0.130, lsw = logo.width*0.546, lsh = logo.height*0.650;
+    const pad = 6;
+    const inner = logoSize - pad*2;
+    const cropRatio = lsw/lsh;
+    let dw = inner, dh = inner/cropRatio;
+    if(dh > inner){ dh = inner; dw = inner*cropRatio; }
+    ctx.drawImage(logo, lsx, lsy, lsw, lsh, logoX+(logoSize-dw)/2, logoY+(logoSize-dh)/2, dw, dh);
   }
 
   ctx.textAlign = vertical ? 'center' : 'left';
   const nameX = vertical ? W/2 : logoX+logoSize+18;
-  const nameY = vertical ? logoY+logoSize+50 : logoY+40;
+  const nameY = vertical ? logoY+logoSize+56 : logoY+40;
   ctx.fillStyle = '#fff';
-  ctx.font = `800 ${vertical?34:24}px 'Baloo 2'`;
+  ctx.font = `800 ${vertical?36:24}px 'Baloo 2'`;
   ctx.fillText('ENTRENA REF BEACH SOCCER', nameX, nameY);
-  ctx.font = `600 ${vertical?22:16}px 'Nunito Sans'`;
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.fillText(opts.eyebrow || 'Resultado del entrenamiento', nameX, nameY + (vertical?34:24));
   ctx.textAlign = 'left';
 
-  let y = vertical ? logoY+logoSize+140 : 250;
+  // Ícono del tipo de entrenamiento + etiqueta, más grande y notorio
+  const TYPE_ICONS = { gym:ICON_GYM, memoria:ICON_MEMORIA, fisicovideo:ICON_FISICOVIDEO, accion:ICON_ACCION, videotest:ICON_VIDEOTEST, pruebas:ICON_PRUEBAS };
+  let y = vertical ? nameY + 70 : nameY + 34;
+  const badgeSize = vertical ? 56 : 36;
+  const eyebrowText = opts.eyebrow || 'Resultado del entrenamiento';
+  if(opts.iconKey && TYPE_ICONS[opts.iconKey]){
+    const icon = await loadImgForCanvas(TYPE_ICONS[opts.iconKey]);
+    if(icon){
+      const bx = vertical ? W/2 - (ctx.measureText(eyebrowText).width + badgeSize + 14)/2 : 44;
+      ctx.font = `800 ${vertical?30:22}px 'Nunito Sans'`;
+      const textW = ctx.measureText(eyebrowText).width;
+      const groupW = badgeSize + 12 + textW;
+      const startX = vertical ? (W-groupW)/2 : 44;
+      ctx.fillStyle = 'rgba(255,255,255,0.96)';
+      roundRectPath(ctx, startX, y-badgeSize+8, badgeSize, badgeSize, 12);
+      ctx.fill();
+      ctx.drawImage(icon, startX+5, y-badgeSize+13, badgeSize-10, badgeSize-10);
+      ctx.fillStyle = '#FFD98A';
+      ctx.textAlign = 'left';
+      ctx.fillText(eyebrowText, startX+badgeSize+12, y);
+    }
+  } else {
+    ctx.fillStyle = '#FFD98A';
+    ctx.font = `800 ${vertical?30:22}px 'Nunito Sans'`;
+    ctx.textAlign = vertical ? 'center' : 'left';
+    ctx.fillText(eyebrowText, vertical?W/2:44, y);
+  }
+  ctx.textAlign = 'left';
+  y += vertical ? 110 : 60;
 
   if(opts.scoreBig){
     ctx.textAlign = vertical ? 'center' : 'left';
     const sx = vertical ? W/2 : 44;
     ctx.fillStyle = '#8CF29A';
-    ctx.font = `800 ${vertical?150:90}px 'Baloo 2'`;
+    ctx.font = `800 ${vertical?170:90}px 'Baloo 2'`;
     ctx.fillText(opts.scoreBig, sx, y);
     if(opts.scoreSmall){
       ctx.fillStyle = 'rgba(255,255,255,0.75)';
-      ctx.font = `700 ${vertical?36:24}px 'Nunito Sans'`;
-      ctx.fillText(opts.scoreSmall, sx, y + (vertical?56:36));
-      y += (vertical?110:70);
+      ctx.font = `700 ${vertical?40:24}px 'Nunito Sans'`;
+      ctx.fillText(opts.scoreSmall, sx, y + (vertical?66:36));
+      y += (vertical?170:70);
     } else {
-      y += (vertical?60:40);
+      y += (vertical?100:40);
     }
     ctx.textAlign = 'left';
   } else if(opts.headline){
     ctx.fillStyle = '#FFD98A';
-    ctx.font = `800 ${vertical?76:50}px 'Baloo 2'`;
-    y = wrapCanvasText(ctx, opts.headline, vertical?W/2:44, y, W - (vertical?140:88), vertical?82:56);
-    if(vertical){ ctx.textAlign='center'; ctx.fillText('', W/2, y); ctx.textAlign='left'; }
-    y += vertical?70:50;
+    ctx.font = `800 ${vertical?92:50}px 'Baloo 2'`;
+    ctx.textAlign = vertical ? 'center' : 'left';
+    y = wrapCanvasText(ctx, opts.headline, vertical?W/2:44, y, W - (vertical?140:88), vertical?98:56);
+    ctx.textAlign = 'left';
+    y += vertical?130:50;
   }
 
   if(opts.daysChecklist && opts.daysChecklist.length){
-    const chipW = vertical ? 130 : 84;
-    const chipH = vertical ? 60 : 40;
-    const gap = 12;
+    const chipW = vertical ? 150 : 84;
+    const chipH = vertical ? 76 : 40;
+    const gap = vertical ? 16 : 12;
     const totalW = opts.daysChecklist.length*chipW + (opts.daysChecklist.length-1)*gap;
     let cx = vertical ? (W-totalW)/2 : 44;
     for(const d of opts.daysChecklist){
-      ctx.fillStyle = 'rgba(255,255,255,0.14)';
-      roundRectPath(ctx, cx, y, chipW, chipH, 12);
+      ctx.fillStyle = 'rgba(255,255,255,0.16)';
+      roundRectPath(ctx, cx, y, chipW, chipH, 14);
       ctx.fill();
       ctx.fillStyle = '#8CF29A';
-      ctx.font = `800 ${vertical?24:16}px 'Nunito Sans'`;
+      ctx.font = `800 ${vertical?28:16}px 'Nunito Sans'`;
       ctx.textAlign = 'center';
-      ctx.fillText(`✔ ${d}`, cx+chipW/2, y+chipH/2+7);
+      ctx.fillText(`✔ ${d}`, cx+chipW/2, y+chipH/2+9);
       ctx.textAlign = 'left';
       cx += chipW+gap;
     }
-    y += chipH + (vertical?40:26);
+    y += chipH + (vertical?70:26);
   }
 
   if(opts.daysText){
     ctx.fillStyle = '#fff';
-    ctx.font = `700 ${vertical?32:24}px 'Nunito Sans'`;
+    ctx.font = `700 ${vertical?36:24}px 'Nunito Sans'`;
     ctx.textAlign = vertical ? 'center' : 'left';
     ctx.fillText(opts.daysText, vertical?W/2:44, y);
     ctx.textAlign = 'left';
-    y += vertical?54:36;
+    y += vertical?90:36;
   }
 
   if(opts.subtext){
     ctx.fillStyle = 'rgba(255,255,255,0.92)';
-    ctx.font = `600 ${vertical?28:20}px 'Nunito Sans'`;
+    ctx.font = `600 ${vertical?32:20}px 'Nunito Sans'`;
     ctx.textAlign = vertical ? 'center' : 'left';
-    y = wrapCanvasText(ctx, opts.subtext, vertical?W/2:44, y, W-(vertical?140:88), vertical?38:26);
+    y = wrapCanvasText(ctx, opts.subtext, vertical?W/2:44, y, W-(vertical?140:88), vertical?42:26);
     ctx.textAlign = 'left';
-    y += vertical?40:24;
+    y += vertical?60:24;
   }
 
   if(opts.statLine){
     ctx.fillStyle = '#FFD98A';
-    ctx.font = `700 ${vertical?26:18}px 'Nunito Sans'`;
+    ctx.font = `700 ${vertical?30:18}px 'Nunito Sans'`;
     ctx.textAlign = vertical ? 'center' : 'left';
-    ctx.fillText(opts.statLine, vertical?W/2:44, vertical?H-140:H-90);
+    ctx.fillText(opts.statLine, vertical?W/2:44, vertical?H-160:H-90);
     ctx.textAlign = 'left';
   }
 
   const motiv = MOTIVATIONAL_MESSAGES[Math.floor(Math.random()*MOTIVATIONAL_MESSAGES.length)];
   ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.font = `italic 700 ${vertical?26:18}px 'Nunito Sans'`;
+  ctx.font = `italic 700 ${vertical?30:18}px 'Nunito Sans'`;
   ctx.textAlign = vertical ? 'center' : 'left';
   ctx.fillText(motiv, vertical?W/2:44, H-56);
   ctx.textAlign = 'left';
@@ -1956,8 +1989,8 @@ async function renderGymHome(body){
     wrap.querySelector('.shareResultBtn').style.cssText += 'background:#fff; color:var(--done-green-dark);';
     attachShareFlow(wrap.querySelector('.shareResultBtn'), ()=>({
       eyebrow: 'Días de gimnasio',
-      scoreBig: `${doneDays.length}/${totalDays}`,
-      scoreSmall: 'días de la semana',
+      iconKey: 'gym',
+      headline: '¡Semana completa!',
       daysChecklist: doneDays.map(d=>d.slice(0,3)),
       daysText: `${doneDays.length} días de ${totalDays} días`,
       statLine: state.gymTotalCompletions ? `🔥 ${state.gymTotalCompletions} rutinas completadas en total` : ''
@@ -2132,6 +2165,7 @@ async function renderGymDay(body){
   if(shareBtn){
     attachShareFlow(shareBtn, ()=>({
       eyebrow: 'Rutina de gimnasio',
+      iconKey: 'gym',
       headline: `¡${state.gymDay} completo!`,
       subtext: dayInfo.title || '',
       statLine: state.gymTotalCompletions ? `🔥 ${state.gymTotalCompletions} rutinas completadas en total` : ''
@@ -3578,6 +3612,7 @@ function renderVideoTestSummary(body){
   `;
   attachShareFlow(body.querySelector('.shareResultBtn'), ()=>({
     eyebrow: 'Video Test',
+    iconKey: 'videotest',
     scoreBig: `${vt.score}`,
     scoreSmall: `de ${vt.maxScore} puntos (${pct}%)`,
     subtext: `${vt.results.length} jugadas resueltas`
@@ -3930,6 +3965,7 @@ function renderPruebaRun(body){
     `;
     attachShareFlow(body.querySelector('.shareResultBtn'), ()=>({
       eyebrow: kindName,
+      iconKey: 'pruebas',
       headline: shareHeadline,
       subtext: pr.kind==='yoyo' && pr.historyRecord && pr.historyRecord.officialLevel ? `Nivel oficial: ${pr.historyRecord.officialLevel}` : ''
     }));
@@ -4093,7 +4129,8 @@ function renderSummary(body){
     <button class="btn btn-secondary" id="homeBtn">Volver al inicio</button>
   `;
   attachShareFlow(body.querySelector('.shareResultBtn'), ()=>({
-    eyebrow: s.type==='accion' ? 'Físico + Video + Acción' : 'Físico + Video',
+    eyebrow: s.type==='accion' ? 'Físico + Video + Acción' : s.type==='memoria' ? 'Memoria arbitral' : 'Físico + Video',
+    iconKey: s.type==='accion' ? 'accion' : s.type==='memoria' ? 'memoria' : 'fisicovideo',
     scoreBig: `${total}`,
     scoreSmall: `de ${max} puntos (${pct}%)`,
     subtext: `${s.series} series completadas`
