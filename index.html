@@ -1847,28 +1847,37 @@ const PRELOADED_ROUTINES = {
     }
   },
   'Mantenimiento': {
-    desc: 'Sostener lo que ya tenés con menos volumen. 3 días full body.',
+    desc: 'Rutina de 3 días, tren superior, para sostener masa y fuerza con poco volumen.',
     days: {
-      'Lunes': { title:'Full body A', exercises:[
-        {name:'Press banca', equipment:'Barra', reps:'3×8–10'},
-        {name:'Remo en polea', equipment:'Polea', reps:'3×8–10'},
-        {name:'Press militar con mancuernas', equipment:'Mancuernas', reps:'3×10–12'},
-        {name:'Curl con barra', equipment:'Barra', reps:'2×10–12'},
-        {name:'Core: Plancha', equipment:'Peso corporal', reps:'2×40s'},
+      'Martes': { title:'Pecho + Espalda + Brazos', exercises:[
+        {name:'Press de banca', equipment:'Barra', reps:'3×6–10'},
+        {name:'Jalón al pecho', equipment:'Polea', reps:'3×8–12'},
+        {name:'Press inclinado con mancuernas', equipment:'Mancuernas', reps:'3×8–12'},
+        {name:'Remo en cable', equipment:'Polea', reps:'3×8–12'},
+        {name:'Elevaciones laterales', equipment:'Mancuernas', reps:'3×12–20'},
+        {name:'Curl de bíceps', equipment:'Mancuernas', reps:'2×10–15'},
+        {name:'Extensión de tríceps en polea', equipment:'Polea', reps:'2×10–15'},
+        {name:'Plancha abdominal', equipment:'Peso corporal', reps:'3×30–60s'},
       ]},
-      'Miércoles': { title:'Full body B', exercises:[
-        {name:'Jalón al pecho', equipment:'Polea', reps:'3×8–10'},
-        {name:'Press inclinado con mancuernas', equipment:'Mancuernas', reps:'3×10–12'},
-        {name:'Elevaciones laterales', equipment:'Mancuernas', reps:'3×12–15'},
-        {name:'Tríceps en polea', equipment:'Polea', reps:'2×12–15'},
-        {name:'Core: Elevación de piernas', equipment:'Peso corporal', reps:'2×15'},
+      'Jueves': { title:'Hombros + Espalda + Brazos', exercises:[
+        {name:'Press militar', equipment:'Barra', reps:'3×6–10'},
+        {name:'Remo con barra o máquina', equipment:'Barra', reps:'3×8–12'},
+        {name:'Chest press en máquina', equipment:'Máquina', reps:'3×8–12'},
+        {name:'Jalón cerrado', equipment:'Polea', reps:'3×10–12'},
+        {name:'Face Pull', equipment:'Cuerdas', reps:'3×12–20'},
+        {name:'Curl martillo', equipment:'Mancuernas', reps:'2×10–15'},
+        {name:'Extensión de tríceps por encima de la cabeza', equipment:'Polea', reps:'2×10–15'},
+        {name:'Elevación de piernas o crunch', equipment:'Peso corporal', reps:'3×12–15'},
       ]},
-      'Viernes': { title:'Full body C', exercises:[
-        {name:'Remo con barra', equipment:'Barra', reps:'3×8–10'},
-        {name:'Press cerrado', equipment:'Barra', reps:'3×8–10'},
-        {name:'Curl martillo', equipment:'Mancuernas', reps:'2×10–12'},
-        {name:'Face Pull', equipment:'Cuerdas', reps:'2×15'},
-        {name:'Core: Russian twist', equipment:'Peso corporal', reps:'2×20'},
+      'Sábado': { title:'Mixto (enfoque en definición)', exercises:[
+        {name:'Press inclinado con barra o mancuernas', equipment:'Barra', reps:'3×8–12'},
+        {name:'Jalón al pecho agarre amplio', equipment:'Polea', reps:'3×8–12'},
+        {name:'Remo en máquina o con mancuerna', equipment:'Máquina', reps:'3×8–12'},
+        {name:'Press de pecho en máquina o pec deck', equipment:'Máquina', reps:'2×10–15'},
+        {name:'Elevaciones laterales en polea o mancuernas', equipment:'Polea', reps:'3×15–20'},
+        {name:'Curl de bíceps en polea', equipment:'Polea', reps:'2×10–15'},
+        {name:'Extensión de tríceps en polea con cuerda', equipment:'Cuerdas', reps:'2×10–15'},
+        {name:'Crunch en máquina o en el suelo', equipment:'Máquina', reps:'3×15–20'},
       ]},
     }
   },
@@ -2081,49 +2090,176 @@ function renderGymRoutinePicker(body){
   body.querySelector('#pickerBack').onclick = ()=>{ state.screen='gymHome'; render(); };
 }
 
+function muscleGroupOf(name){
+  const n = name.toLowerCase();
+  if(/core|plancha|crunch|elevaci[oó]n de piernas|russian|mountain|body saw|burpee|dead bug|bear/.test(n)) return 'Core';
+  if(/curl|tr[ií]ceps|press cerrado|press franc[eé]s/.test(n)) return 'Brazos';
+  if(/militar|elevaciones laterales|elevaciones posteriores|face pull|arnold|p[aá]jaros|reverse/.test(n)) return 'Hombros';
+  if(/jal[oó]n|remo|pullover|dominada|peso muerto/.test(n)) return 'Espalda';
+  if(/press|pec deck|aperturas|cruce|fondos|chest/.test(n)) return 'Pecho';
+  return 'Otros';
+}
+const MUSCLE_GROUPS = ['Pecho','Espalda','Hombros','Brazos','Core','Otros'];
+
 function renderGymCustomBuilder(body){
-  body.innerHTML = `
-    <h2 style="margin-bottom:4px;">Crear mi propia rutina</h2>
-    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 14px;">Elegí ejercicios de las rutinas precargadas y asignale un día a cada uno.</p>
-    <div id="builderList"></div>
-    <button class="btn btn-primary" id="saveCustomBtn">Guardar los que elegí</button>
-    <button class="btn btn-secondary" id="builderBack">Volver</button>
-  `;
-  const list = body.querySelector('#builderList');
-  const picks = []; // {name, equipment, reps, dayEl}
-  Object.keys(PRELOADED_ROUTINES).forEach(routineName=>{
-    const def = PRELOADED_ROUTINES[routineName];
-    const section = document.createElement('div');
-    section.innerHTML = `<div class="group-label" style="margin-top:10px;">${routineName}</div>`;
+  const selections = {};   // key -> {ex, day, checked}
+  const extras = [];       // ejercicios nuevos creados a mano
+  let mode = 'rutina';
+
+  // Lista plana con todos los ejercicios de todas las rutinas
+  const all = [];
+  Object.keys(PRELOADED_ROUTINES).forEach(routine=>{
+    const def = PRELOADED_ROUTINES[routine];
     Object.keys(def.days).forEach(day=>{
       def.days[day].exercises.forEach(ex=>{
-        const row = document.createElement('div');
-        row.className = 'ex-item';
-        row.style.padding = '8px 12px';
-        row.innerHTML = `
-          <input type="checkbox" class="pickCb" style="width:auto; margin-top:2px;">
-          <div class="ex-body">
-            <div class="name" style="font-size:13px;">${ex.name} ${ex.equipment ? `<span class="pill">${ex.equipment}</span>` : ''}</div>
-            <div class="answers">${ex.reps}</div>
-          </div>
-          <select class="pickDay" style="width:auto; padding:6px 8px; font-size:12px;">${GYM_DAYS.map(d=>`<option value="${d}" ${d===day?'selected':''}>${d.slice(0,3)}</option>`).join('')}</select>
-        `;
-        const cb = row.querySelector('.pickCb');
-        const daySel = row.querySelector('.pickDay');
-        picks.push({ex, cbEl:cb, daySelEl:daySel});
-        section.appendChild(row);
+        all.push({routine, day, ex, key: ex.name.toLowerCase()+'|'+ex.equipment});
       });
     });
-    list.appendChild(section);
   });
+
+  body.innerHTML = `
+    <h2 style="margin-bottom:4px;">Crear mi propia rutina</h2>
+    <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 10px;">Elegí ejercicios de las rutinas precargadas, ordenados como quieras, y asignale un día a cada uno.</p>
+    <div style="display:flex; gap:6px; margin-bottom:12px;" id="modeBtns"></div>
+    <div id="builderList"></div>
+    <div class="group-label" style="margin-top:14px;">Agregar un ejercicio nuevo</div>
+    <div class="card pro-card">
+      <label>Nombre</label>
+      <input type="text" id="nxName" placeholder="Ej: Press Hammer">
+      <label style="margin-top:10px;">Con qué lo hacés</label>
+      <select id="nxEquip">${GYM_EQUIPMENT.map(e=>`<option value="${e}">${e}</option>`).join('')}</select>
+      <label style="margin-top:10px;">Grupo muscular</label>
+      <select id="nxGroup">${MUSCLE_GROUPS.map(g=>`<option value="${g}">${g}</option>`).join('')}</select>
+      <label style="margin-top:10px;">Repeticiones (ej: 4×6–10)</label>
+      <input type="text" id="nxReps" placeholder="Ej: 3×10–12">
+      <label style="margin-top:10px;">Día</label>
+      <select id="nxDay">${GYM_DAYS.map(d=>`<option value="${d}">${d}</option>`).join('')}</select>
+      <button class="btn btn-secondary" id="nxAdd" style="margin-top:12px;">+ Sumar a mi selección</button>
+    </div>
+    <div id="extrasList"></div>
+    <button class="btn btn-primary" id="saveCustomBtn">Guardar mi rutina</button>
+    <button class="btn btn-secondary" id="builderBack">Volver</button>
+  `;
+
+  const list = body.querySelector('#builderList');
+  const modeBtns = body.querySelector('#modeBtns');
+
+  function makeRow(item){
+    const row = document.createElement('div');
+    row.className = 'ex-item';
+    row.style.padding = '8px 12px';
+    const sel = selections[item.key];
+    row.innerHTML = `
+      <input type="checkbox" class="pickCb" style="width:auto; margin-top:2px;" ${sel && sel.checked ? 'checked' : ''}>
+      <div class="ex-body">
+        <div class="name" style="font-size:13px;">${item.ex.name} <span class="pill">${item.ex.equipment}</span></div>
+        <div class="answers">${item.ex.reps}</div>
+      </div>
+      <select class="pickDay" style="width:auto; padding:6px 8px; font-size:12px;">${GYM_DAYS.map(d=>`<option value="${d}" ${d===((sel&&sel.day)||item.day)?'selected':''}>${d.slice(0,3)}</option>`).join('')}</select>
+    `;
+    const cb = row.querySelector('.pickCb');
+    const daySel = row.querySelector('.pickDay');
+    const upd = ()=>{ selections[item.key] = { ex:item.ex, day:daySel.value, checked:cb.checked }; };
+    cb.onchange = upd;
+    daySel.onchange = upd;
+    return row;
+  }
+  function uniqueByKey(arr){
+    const seen = new Set(); const out = [];
+    arr.forEach(it=>{ if(!seen.has(it.key)){ seen.add(it.key); out.push(it); } });
+    return out;
+  }
+  function header(text){
+    const h = document.createElement('div');
+    h.className = 'group-label';
+    h.style.marginTop = '10px';
+    h.textContent = text;
+    return h;
+  }
+  function renderList(){
+    list.innerHTML = '';
+    if(mode==='rutina'){
+      Object.keys(PRELOADED_ROUTINES).forEach(routine=>{
+        list.appendChild(header(routine));
+        uniqueByKey(all.filter(i=>i.routine===routine)).forEach(it=> list.appendChild(makeRow(it)));
+      });
+    } else if(mode==='alfabetico'){
+      const sorted = uniqueByKey(all).sort((a,b)=> a.ex.name.localeCompare(b.ex.name,'es'));
+      let lastLetter = '';
+      sorted.forEach(it=>{
+        const letter = it.ex.name.charAt(0).toUpperCase();
+        if(letter!==lastLetter){ list.appendChild(header(letter)); lastLetter = letter; }
+        list.appendChild(makeRow(it));
+      });
+    } else {
+      const uniq = uniqueByKey(all);
+      MUSCLE_GROUPS.forEach(g=>{
+        const items = uniq.filter(i=>muscleGroupOf(i.ex.name)===g).sort((a,b)=> a.ex.name.localeCompare(b.ex.name,'es'));
+        if(items.length){
+          list.appendChild(header(g));
+          items.forEach(it=> list.appendChild(makeRow(it)));
+        }
+      });
+    }
+  }
+  function renderModeBtns(){
+    modeBtns.innerHTML = '';
+    [['rutina','Por rutina'],['alfabetico','A–Z'],['grupo','Por grupo muscular']].forEach(([m,label])=>{
+      const b = document.createElement('button');
+      b.className = 'btn ' + (mode===m ? 'btn-primary' : 'btn-secondary');
+      b.style.cssText = 'margin-top:0; padding:8px 6px; font-size:12px; flex:1;';
+      b.textContent = label;
+      b.onclick = ()=>{ mode = m; renderModeBtns(); renderList(); };
+      modeBtns.appendChild(b);
+    });
+  }
+  function renderExtras(){
+    const wrap = body.querySelector('#extrasList');
+    wrap.innerHTML = extras.length ? `<div class="group-label" style="margin-top:10px;">Ejercicios nuevos que sumaste</div>` : '';
+    extras.forEach((x,i)=>{
+      const row = document.createElement('div');
+      row.className = 'ex-item';
+      row.style.padding = '8px 12px';
+      row.innerHTML = `
+        <div class="ex-body">
+          <div class="name" style="font-size:13px;">${x.name} <span class="pill">${x.equipment}</span> <span class="pill">${x.group}</span></div>
+          <div class="answers">${x.reps || ''} · ${x.day}</div>
+        </div>
+        <button class="del-btn">${ICONS.trash}</button>`;
+      row.querySelector('.del-btn').onclick = ()=>{ extras.splice(i,1); renderExtras(); };
+      wrap.appendChild(row);
+    });
+  }
+
+  renderModeBtns();
+  renderList();
+
+  body.querySelector('#nxAdd').onclick = ()=>{
+    const name = body.querySelector('#nxName').value.trim();
+    if(!name){ alert('Ponele un nombre al ejercicio.'); return; }
+    extras.push({
+      name,
+      equipment: body.querySelector('#nxEquip').value,
+      group: body.querySelector('#nxGroup').value,
+      reps: body.querySelector('#nxReps').value.trim(),
+      day: body.querySelector('#nxDay').value
+    });
+    body.querySelector('#nxName').value = '';
+    body.querySelector('#nxReps').value = '';
+    renderExtras();
+  };
+
   body.querySelector('#saveCustomBtn').onclick = async ()=>{
-    const chosen = picks.filter(p=>p.cbEl.checked);
-    if(chosen.length===0){ alert('Marcá al menos un ejercicio.'); return; }
+    const chosen = Object.values(selections).filter(s=>s.checked);
+    if(chosen.length===0 && extras.length===0){ alert('Marcá al menos un ejercicio o sumá uno nuevo.'); return; }
     const btn = body.querySelector('#saveCustomBtn');
     btn.disabled = true; btn.textContent = 'Guardando...';
-    for(const p of chosen){
-      const day = p.daySelEl.value;
-      const created = await dbCreateGymExercise(state.userEmail, day, p.ex.name, p.ex.equipment, '', p.ex.reps);
+    for(const s of chosen){
+      const created = await dbCreateGymExercise(state.userEmail, s.day, s.ex.name, s.ex.equipment, '', s.ex.reps);
+      state.gymExercises.push(created);
+    }
+    for(const x of extras){
+      const created = await dbCreateGymExercise(state.userEmail, x.day, x.name, x.equipment, '', x.reps);
       state.gymExercises.push(created);
     }
     state.screen = 'gymHome';
